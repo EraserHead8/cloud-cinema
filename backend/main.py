@@ -252,6 +252,10 @@ async def get_video_link(kp_id: str):
     Fetch direct .m3u8 stream link from Collaps (strvid.ws).
     Returns the ORIGINAL provider link for the proxy to handle.
     """
+    # Validate KP ID (Must be numeric)
+    if not kp_id.isdigit():
+         raise HTTPException(status_code=400, detail="Invalid Kinopoisk ID")
+
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Referer": "https://kinopoisk.ru/"
