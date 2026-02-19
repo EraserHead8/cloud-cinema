@@ -98,9 +98,9 @@ function App() {
             </button>
             <button
               onClick={handleClearAll}
-              className="text-xs font-bold tracking-widest text-white/50 hover:text-white uppercase border border-white/10 hover:border-white/30 px-3 py-1 rounded-full transition-colors"
+              className="text-xs font-bold tracking-widest text-white/80 hover:text-white uppercase bg-red-800 hover:bg-red-600 border border-red-900 px-6 py-2 rounded-full transition-all shadow-lg hover:shadow-red-900/50"
             >
-              Очистить всё
+              ОЧИСТИТЬ ВСЁ
             </button>
           </div>
         </header>
