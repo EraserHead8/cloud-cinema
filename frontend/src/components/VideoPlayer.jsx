@@ -5,6 +5,9 @@ const VideoPlayer = ({ movie, isOpen, onClose }) => {
 
     const kpId = movie.video_url?.startsWith('KP:') ? movie.video_url.replace('KP:', '') : movie.video_url;
 
+    // Используем надежный агрегатор с защитой от блокировок
+    const playerSrc = `https://vidsrc.xyz/embed/movie/${kpId}`;
+
     return (
         <div className="fixed inset-0 bg-black/95 z-50 flex flex-col highlight-white/5">
             <div className="flex justify-between items-center p-4 bg-zinc-900 border-b border-zinc-800">
@@ -19,10 +22,13 @@ const VideoPlayer = ({ movie, isOpen, onClose }) => {
 
             <div className="flex-1 w-full bg-black relative">
                 <iframe
-                    src={`https://vidsrc.cc/v2/embed/movie/${kpId}`}
+                    src={playerSrc}
                     className="w-full h-full border-0 absolute inset-0"
                     allowFullScreen
+                    webkitallowfullscreen="true"
+                    mozallowfullscreen="true"
                     allow="autoplay; encrypted-media; picture-in-picture"
+                    // Sandbox без allow-top-navigation, чтобы не было редиректов на рекламу
                     sandbox="allow-forms allow-scripts allow-same-origin allow-presentation"
                     title={`Player for ${movie.title}`}
                 ></iframe>
