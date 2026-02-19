@@ -9,8 +9,8 @@ const VideoPlayer = ({ movie, isOpen, onClose }) => {
     // Логируем в консоль для проверки (пользователь увидит в F12)
     console.log("Initiating Kodik player for ID:", cleanId);
 
-    // Используем стабильное зеркало Kodik
-    const playerSrc = `https://shiza.libdoor.cyou/serial/kp/${cleanId}/iframe`;
+    // Используем стабильное зеркало Kodik (универсальный endpoint /video/kp/)
+    const playerSrc = `https://shiza.libdoor.cyou/video/kp/${cleanId}`;
 
     return (
         <div className="fixed inset-0 bg-black/95 z-50 flex flex-col highlight-white/5">
