@@ -1,57 +1,80 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 const VideoPlayer = ({ movie, isOpen, onClose }) => {
-    const [currentIndex, setCurrentIndex] = useState(0);
+    const containerRef = useRef(null);
+
+    useEffect(() => {
+        if (!isOpen || !movie) return;
+
+        // Remove 'KP:' prefix to get clean ID
+        const kpId = movie.video_url?.startsWith('KP:') ? movie.video_url.replace('KP:', '') : null;
+
+        if (!kpId) return;
+
+        const initKinobox = () => {
+            // Check if kbox is available globally and container exists
+            // We use window.kbox because it's loaded from external script
+            if (typeof window.kbox !== 'undefined' && containerRef.current) {
+                try {
+                    // Clear container before init to prevent duplicates
+                    containerRef.current.innerHTML = '';
+
+                    window.kbox(containerRef.current, {
+                        search: { kinopoisk: kpId },
+                        menu: {
+                            enable: true,
+                            default: 'menu_list',
+                            mobile: true,
+                            format: '{N} :: {T} ({Q})'
+                        },
+                        players: {} // Auto-detect available players
+                    });
+                } catch (e) {
+                    console.error("Kinobox init error:", e);
+                }
+            }
+        };
+
+        // Dynamically load script if not present
+        if (!document.getElementById('kinobox-script')) {
+            const script = document.createElement('script');
+            script.id = 'kinobox-script';
+            script.src = 'https://kinobox.tv/kinobox.min.js';
+            script.async = true;
+            script.onload = initKinobox;
+            document.body.appendChild(script);
+        } else {
+            // If script already loaded, just init for new movie
+            initKinobox();
+        }
+
+    }, [isOpen, movie]);
 
     if (!isOpen || !movie) return null;
 
-    const kpId = movie.video_url?.startsWith('KP:') ? movie.video_url.replace('KP:', '') : null;
-
-    // Самые стабильные iframe-балансеры на данный момент (без токенов)
-    const players = kpId ? [
-        { name: "Alloha", url: `https://api.alloha.tv/?kp=${kpId}` },
-        { name: "VidSrc", url: `https://vidsrc.ru/embed/kp/${kpId}` },
-        { name: "Vibix", url: `https://vibix.org/embed/kp/${kpId}` },
-        { name: "KinoPlay", url: `https://kinoplay.app/api/iframe?kp=${kpId}` },
-        { name: "VoidBoost", url: `https://voidboost.net/embed/${kpId}` }
-    ] : [];
-
     return (
-        <div className="fixed inset-0 bg-black/95 z-50 flex flex-col">
-            <div className="flex justify-between items-center p-4 bg-zinc-900 border-b border-zinc-800">
-                <h2 className="text-white text-xl font-bold">{movie.title}</h2>
-                <button onClick={onClose} className="text-white hover:text-red-500 text-2xl transition-colors">✕</button>
+        <div className="fixed inset-0 bg-black/95 z-50 flex flex-col animate-in fade-in duration-300">
+            {/* Header */}
+            <div className="flex justify-between items-center p-4 bg-zinc-900/90 backdrop-blur border-b border-zinc-800 z-10">
+                <h2 className="text-white text-lg md:text-xl font-bold truncate max-w-[80%]">
+                    {movie.title}
+                </h2>
+                <button
+                    onClick={onClose}
+                    className="text-zinc-400 hover:text-white bg-zinc-800/50 hover:bg-red-600/20 hover:border-red-500 border border-zinc-700 rounded-full w-10 h-10 flex items-center justify-center transition-all"
+                >
+                    ✕
+                </button>
             </div>
 
-            {players.length > 0 && (
-                <div className="flex gap-2 p-3 bg-zinc-900 overflow-x-auto">
-                    {players.map((p, idx) => (
-                        <button
-                            key={p.name}
-                            onClick={() => setCurrentIndex(idx)}
-                            className={`px-4 py-2 rounded font-medium transition-colors whitespace-nowrap ${currentIndex === idx
-                                    ? 'bg-red-600 text-white shadow-lg'
-                                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
-                                }`}
-                        >
-                            {p.name}
-                        </button>
-                    ))}
-                </div>
-            )}
-
-            <div className="flex-1 w-full relative bg-black">
-                {players.length > 0 ? (
-                    <iframe
-                        key={players[currentIndex].url}
-                        src={players[currentIndex].url}
-                        className="absolute inset-0 w-full h-full border-0"
-                        allowFullScreen
-                        allow="autoplay; fullscreen"
-                    ></iframe>
+            {/* Player Container */}
+            <div className="flex-1 w-full relative bg-black flex items-center justify-center overflow-hidden">
+                {movie.video_url?.startsWith('KP:') ? (
+                    <div ref={containerRef} className="kinobox_player w-full h-full"></div>
                 ) : (
-                    <div className="text-white flex items-center justify-center h-full text-xl opacity-50">
-                        ID Кинопоиска не найден
+                    <div className="text-white/50 text-xl flex flex-col items-center gap-2">
+                        <span>⚠️</span>
+                        <span>ID Кинопоиска не найден</span>
                     </div>
                 )}
             </div>
