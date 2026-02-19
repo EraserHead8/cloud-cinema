@@ -44,4 +44,14 @@ export const sendCommand = async (text) => {
     return response.data;
 };
 
+export const deleteMovie = async (movieId) => {
+    const response = await api.delete(`/api/movies/${movieId}`);
+    return response.data;
+};
+
+export const clearLibrary = async () => {
+    const response = await api.delete('/api/movies/clear-all');
+    return response.data;
+};
+
 export default api;
