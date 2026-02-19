@@ -151,6 +151,7 @@ async def process_command(
     try:
         results = await search_kinopoisk(target_title)
     except Exception as e:
+        print(f"Kinopoisk Search Error: {e}")
         return {"status": "error", "message": f"Ошибка поиска: {str(e)}"}
 
     if not results:
