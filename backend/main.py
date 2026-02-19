@@ -244,11 +244,13 @@ async def get_player_url(kp: str):
         except Exception as e:
             print(f"VideoCDN API error: {e}")
 
+from fastapi.responses import StreamingResponse, Response
+
 @app.get("/api/video/get-link/{kp_id}")
 async def get_video_link(kp_id: str):
     """
     Fetch direct .m3u8 stream link from Collaps (strvid.ws).
-    Bypasses ISP blocks by proxying the request server-side.
+    Returns the ORIGINAL provider link for the proxy to handle.
     """
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -284,6 +286,72 @@ async def get_video_link(kp_id: str):
             print(f"Collaps relay error: {e}")
 
     raise HTTPException(status_code=404, detail="Источник не найден на стороне сервера")
+
+@app.get("/api/video/proxy-m3u8")
+async def proxy_m3u8(url: str):
+    """
+    Proxies the m3u8 playlist, rewriting TS segments to route through our server.
+    """
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    if "referer" in url:
+         headers["Referer"] = "https://kinopoisk.ru/" # Basic referer if needed
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True, headers=headers) as client:
+            resp = await client.get(url)
+            if resp.status_code != 200:
+                raise HTTPException(status_code=resp.status_code, detail="Failed to fetch playlist")
+            
+            content = resp.text
+            base_url = url.rsplit("/", 1)[0]
+            
+            new_lines = []
+            for line in content.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                if line.startswith("#"):
+                    new_lines.append(line)
+                else:
+                    # It's a segment or sub-playlist
+                    full_segment_url = line
+                    if not line.startswith("http"):
+                        full_segment_url = f"{base_url}/{line}"
+                    
+                    # Encode for query param
+                    import urllib.parse
+                    encoded_seg = urllib.parse.quote(full_segment_url)
+                    
+                    # Route through our segment proxy
+                    # We assume relative path context or absolute path to api
+                    # Since frontend calls this, we return relative API path
+                    new_lines.append(f"/api/video/segment?url={encoded_seg}")
+            
+            return Response(content="\n".join(new_lines), media_type="application/vnd.apple.mpegurl")
+
+    except Exception as e:
+        print(f"Proxy M3U8 Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/video/segment")
+async def proxy_segment(url: str):
+    """
+    Proxies the actual video segment (TS file).
+    Streamed directly to client to save memory.
+    """
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    
+    async def iterfile():
+        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, headers=headers) as client:
+            async with client.stream("GET", url) as req:
+                async for chunk in req.aiter_bytes():
+                    yield chunk
+                    
+    return StreamingResponse(iterfile(), media_type="video/mp2t")
 
 # Serve Frontend - Disabled for Dev (Vite)
 # app.mount("/", StaticFiles(directory="../frontend/dist", html=True), name="static")
