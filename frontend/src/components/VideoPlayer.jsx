@@ -13,21 +13,35 @@ const VideoPlayer = ({ movie, isOpen, onClose }) => {
 
         const initKinobox = () => {
             // Check if kbox is available globally and container exists
-            // We use window.kbox because it's loaded from external script
             if (typeof window.kbox !== 'undefined' && containerRef.current) {
                 try {
                     // Clear container before init to prevent duplicates
                     containerRef.current.innerHTML = '';
 
                     window.kbox(containerRef.current, {
-                        search: { kinopoisk: kpId },
+                        search: {
+                            kinopoisk: kpId,
+                            title: movie.title // Fallback search by title
+                        },
                         menu: {
                             enable: true,
                             default: 'menu_list',
                             mobile: true,
                             format: '{N} :: {T} ({Q})'
                         },
-                        players: {} // Auto-detect available players
+                        players: {
+                            alloha: { enable: true, position: 1 },
+                            kodik: { enable: true, position: 2 },
+                            videocdn: { enable: true, position: 3 },
+                            collaps: { enable: true, position: 4 },
+                            ashdi: { enable: true, position: 5 },
+                            hdvb: { enable: true, position: 6 }
+                        },
+                        params: {
+                            all: {
+                                referrer: "https://kinopoisk.ru",
+                            }
+                        }
                     });
                 } catch (e) {
                     console.error("Kinobox init error:", e);
