@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000';
+// Relative URL for Nginx proxy
+const API_URL = '';
+
 
 // --- Axios instance with auth interceptor ---
 const api = axios.create({ baseURL: API_URL });

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000';
+// Relative URL for Nginx proxy
+const API_URL = '';
+
 
 const Auth = ({ onLogin }) => {
     const [email, setEmail] = useState('');
