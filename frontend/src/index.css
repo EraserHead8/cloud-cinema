@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #141414;
+  /* Netflix Dark */
+  color: white;
+  font-family: 'Inter', sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+/* Custom Cinema Utilities */
+.bg-cinema-bg {
+  background-color: #141414;
+}
+
+.bg-cinema-card {
+  background-color: #1a1a1a;
+}
+
+.text-cinema-accent {
+  color: #e50914;
+  /* Netflix Red */
+}

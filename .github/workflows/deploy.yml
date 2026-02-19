@@ -1,0 +1,40 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Deploy via SSH
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        password: ${{ secrets.PASSWORD }}
+        script: |
+          # Create directory if not exists (first run)
+          mkdir -p /root/cloud-cinema
+          
+          # Go to project dir
+          cd /root/cloud-cinema
+          
+          # Pull latest changes (assuming repo is already cloned or will be initialized manually first time)
+          # Ideally, you'd clone if not exists, but 'git pull' assumes it's there.
+          # If it's a fresh deploy, you might need 'git clone ... .' or handling that.
+          # For this task, we assume the repo exists or we are updating.
+          # Simple robustness check:
+          if [ ! -d ".git" ]; then
+            git clone https://github.com/${{ github.repository }} .
+          else
+            git pull origin main
+          fi
+          
+          # Build and run containers
+          docker-compose up -d --build
+          
+          # Prune unused images to save space
+          docker image prune -f
