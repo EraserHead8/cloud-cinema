@@ -98,7 +98,7 @@ function App() {
             </button>
             <button
               onClick={handleClearAll}
-              className="text-xs font-bold tracking-widest text-white/90 hover:text-white uppercase bg-red-700 hover:bg-red-600 border border-red-800 px-6 py-2 rounded-full transition-all shadow-lg hover:shadow-red-900/50"
+              className="text-xs font-bold tracking-widest text-white uppercase bg-red-600 hover:bg-red-500 border border-red-500 px-6 py-2 rounded-full transition-all shadow-lg hover:shadow-red-500/50"
             >
               ОЧИСТИТЬ БИБЛИОТЕКУ
             </button>
