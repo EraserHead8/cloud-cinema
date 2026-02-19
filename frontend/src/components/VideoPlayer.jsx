@@ -21,7 +21,9 @@ const VideoPlayer = ({ movie, isOpen, onClose }) => {
                     window.kbox(containerRef.current, {
                         search: {
                             kinopoisk: kpId,
-                            title: movie.title // Fallback search by title
+                            // title: movie.title // Removed default title search to rely on ID first, 
+                            // but user config in prompt didn't strictly forbid it. 
+                            // Sticking to user provided "bulletproof" config structure mainly.
                         },
                         menu: {
                             enable: true,
@@ -34,12 +36,11 @@ const VideoPlayer = ({ movie, isOpen, onClose }) => {
                             kodik: { enable: true, position: 2 },
                             videocdn: { enable: true, position: 3 },
                             collaps: { enable: true, position: 4 },
-                            ashdi: { enable: true, position: 5 },
-                            hdvb: { enable: true, position: 6 }
+                            ashdi: { enable: true, position: 5 }
                         },
                         params: {
                             all: {
-                                referrer: "https://kinopoisk.ru",
+                                referrer: "https://www.kinopoisk.ru",
                             }
                         }
                     });
