@@ -1,4 +1,4 @@
-import os
+
 import asyncio
 import httpx
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Depends
@@ -18,11 +18,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Delete old DB to avoid schema conflicts ---
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "sql_app.db")
-if os.path.exists(DB_PATH):
-    os.remove(DB_PATH)
-    print("🗑️  Old sql_app.db deleted (schema changed)")
+
 
 # Initialize DB
 models.Base.metadata.create_all(bind=database.engine)
