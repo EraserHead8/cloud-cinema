@@ -5,8 +5,8 @@ const VideoPlayer = ({ movie, isOpen, onClose }) => {
 
     const kpId = movie.video_url?.startsWith('KP:') ? movie.video_url.replace('KP:', '') : movie.video_url;
 
-    // Используем надежный агрегатор с защитой от блокировок
-    const playerSrc = `https://vidsrc.xyz/embed/movie/${kpId}`;
+    // vidsrc.cc сейчас работает стабильнее в РФ, чем xyz
+    const playerSrc = `https://vidsrc.cc/v2/embed/movie/${kpId}`;
 
     return (
         <div className="fixed inset-0 bg-black/95 z-50 flex flex-col highlight-white/5">
