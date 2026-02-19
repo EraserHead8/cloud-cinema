@@ -19,28 +19,23 @@ const VideoPlayer = ({ movie, isOpen, onClose }) => {
                     containerRef.current.innerHTML = '';
 
                     window.kbox(containerRef.current, {
-                        search: {
-                            kinopoisk: kpId,
-                            // title: movie.title // Removed default title search to rely on ID first, 
-                            // but user config in prompt didn't strictly forbid it. 
-                            // Sticking to user provided "bulletproof" config structure mainly.
-                        },
-                        menu: {
-                            enable: true,
-                            default: 'menu_list',
-                            mobile: true,
-                            format: '{N} :: {T} ({Q})'
-                        },
+                        search: { kinopoisk: kpId },
+                        menu: { enable: true, default: 'menu_list' },
                         players: {
-                            alloha: { enable: true, position: 1 },
-                            kodik: { enable: true, position: 2 },
-                            videocdn: { enable: true, position: 3 },
-                            collaps: { enable: true, position: 4 },
-                            ashdi: { enable: true, position: 5 }
+                            alloha: { enable: true },
+                            kodik: { enable: true },
+                            videocdn: { enable: true },
+                            collaps: { enable: true }
                         },
                         params: {
                             all: {
-                                referrer: "https://www.kinopoisk.ru",
+                                // Force domain to bypass block
+                                domain: "https://kinobox.tv",
+                                referrer: "https://www.google.com"
+                            },
+                            kodik: {
+                                // Strict proxying for Kodik
+                                strict: true
                             }
                         }
                     });
