@@ -1,80 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
-import videojs from 'video.js';
-import 'video.js/dist/video-js.css';
+import React, { useRef } from 'react';
 
 const VideoPlayer = ({ movie, isOpen, onClose }) => {
-    const videoRef = useRef(null);
-    const playerRef = useRef(null);
-    const [streamUrl, setStreamUrl] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-
-    // Clean KP ID
-    const kpId = movie?.video_url?.replace(/\D/g, '');
-
-    // Fetch Stream Chain (Provider -> Proxy)
-    useEffect(() => {
-        if (!isOpen || !kpId) return;
-
-        const fetchStream = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                // 1. Get original URL from provider (via backend)
-                const response = await fetch(`/api/video/get-link/${kpId}`);
-                if (!response.ok) throw new Error("Stream not available");
-                const data = await response.json();
-
-                if (data.stream_url) {
-                    // 2. Construct Proxy URL
-                    // We route the original m3u8 through our proxy
-                    const proxyUrl = `/api/video/proxy-m3u8?url=${encodeURIComponent(data.stream_url)}`;
-                    setStreamUrl(proxyUrl);
-                } else {
-                    throw new Error("Invalid response from server");
-                }
-            } catch (err) {
-                console.error("Stream fetch error:", err);
-                setError("Серверный прокси недоступен. Попробуйте позже.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchStream();
-    }, [isOpen, kpId]);
-
-    // Initialize Video.js
-    useEffect(() => {
-        if (streamUrl && videoRef.current) {
-            playerRef.current = videojs(videoRef.current, {
-                controls: true,
-                autoplay: true,
-                preload: 'auto',
-                fluid: true,
-                sources: [{
-                    src: streamUrl,
-                    type: 'application/x-mpegURL'
-                }],
-                html5: {
-                    hls: {
-                        overrideNative: true,
-                        enableLowInitialPlaylist: true,
-                    }
-                }
-            });
-
-            // Cleanup
-            return () => {
-                if (playerRef.current) {
-                    playerRef.current.dispose();
-                    playerRef.current = null;
-                }
-            };
-        }
-    }, [streamUrl]);
+    const iframeRef = useRef(null);
 
     if (!isOpen || !movie) return null;
+
+    const kpId = movie.video_url?.replace(/\D/g, '');
+
+    // Point to our backend proxy endpoint
+    const proxyUrl = `/api/proxy-player?kp_id=${kpId}`;
 
     return (
         <div className="fixed inset-0 bg-black/95 z-50 flex flex-col highlight-white/5">
@@ -88,26 +22,15 @@ const VideoPlayer = ({ movie, isOpen, onClose }) => {
                 </button>
             </div>
 
-            <div className="flex-1 w-full bg-black relative flex items-center justify-center">
-                {loading && <div className="text-white text-lg animate-pulse">Запуск серверного прокси (Full HLS)...</div>}
-
-                {error && (
-                    <div className="text-red-500 text-center p-4">
-                        <p className="font-bold text-xl mb-2">Ошибка проксирования</p>
-                        <p>{error}</p>
-                        <p className="text-sm text-zinc-500 mt-2">ID: {kpId}</p>
-                    </div>
-                )}
-
-                {!loading && !error && streamUrl && (
-                    <div data-vjs-player className="w-full h-full">
-                        <video
-                            ref={videoRef}
-                            className="video-js vjs-big-play-centered w-full h-full"
-                            crossOrigin="anonymous"
-                        />
-                    </div>
-                )}
+            <div className="flex-1 w-full bg-black relative">
+                <iframe
+                    ref={iframeRef}
+                    src={proxyUrl}
+                    className="w-full h-full border-0 absolute inset-0"
+                    allowFullScreen
+                    allow="autoplay; encrypted-media; fullscreen"
+                    title={`Player for ${movie.title}`}
+                ></iframe>
             </div>
         </div>
     );

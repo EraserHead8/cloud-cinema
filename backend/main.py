@@ -244,118 +244,41 @@ async def get_player_url(kp: str):
         except Exception as e:
             print(f"VideoCDN API error: {e}")
 
-from fastapi.responses import StreamingResponse, Response
+from fastapi.responses import HTMLResponse
 
-@app.get("/api/video/get-link/{kp_id}")
-async def get_video_link(kp_id: str):
+@app.get("/api/proxy-player", response_class=HTMLResponse)
+async def proxy_player(kp_id: str):
     """
-    Fetch direct .m3u8 stream link from Collaps (strvid.ws).
-    Returns the ORIGINAL provider link for the proxy to handle.
+    Returns an HTML page with an iframe to the video provider (Shiza/Collaps).
+    Embeds 'no-referrer' meta tag to hide the source origin from the provider.
+    This bypasses blocking by making the request appear direct but anonymous.
     """
-    # Validate KP ID (Must be numeric)
-    if not kp_id.isdigit():
-         raise HTTPException(status_code=400, detail="Invalid Kinopoisk ID")
+    if not kp_id or not kp_id.isdigit():
+        return HTMLResponse(content="<h1>Invalid ID</h1>", status_code=400)
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://kinopoisk.ru/"
-    }
-    
-    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, headers=headers) as client:
-        try:
-            # Request to Collaps Mirror
-            resp = await client.get(f"https://api.strvid.ws/embed/movie/{kp_id}")
-            if resp.status_code == 200:
-                content = resp.text
-                
-                # Check for direct file patterns in source
-                import re
-                
-                # Pattern 1: file: "..."
-                match = re.search(r"file:[\s\"']+(https?://.*?\.m3u8.*?)[\"']", content)
-                if match:
-                    return {"stream_url": match.group(1)}
-                
-                # Pattern 2: src: "..."
-                match_src = re.search(r"src:[\s\"']+(https?://.*?\.m3u8.*?)[\"']", content)
-                if match_src:
-                    return {"stream_url": match_src.group(1)}
-                    
-                # Pattern 3: source src="..."
-                match_source = re.search(r"<source[^>]+src=[\"'](https?://.*?\.m3u8.*?)[\"']", content)
-                if match_source:
-                    return {"stream_url": match_source.group(1)}
-
-        except Exception as e:
-            print(f"Collaps relay error: {e}")
-
-    raise HTTPException(status_code=404, detail="Источник не найден на стороне сервера")
-
-@app.get("/api/video/proxy-m3u8")
-async def proxy_m3u8(url: str):
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="referrer" content="no-referrer">
+        <title>Player</title>
+        <style>
+            body, html {{ margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }}
+            iframe {{ width: 100%; height: 100%; border: none; }}
+        </style>
+    </head>
+    <body>
+        <iframe 
+            src="https://shiza.libdoor.cyou/video/kp/{kp_id}" 
+            allowfullscreen 
+            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+        ></iframe>
+    </body>
+    </html>
     """
-    Proxies the m3u8 playlist, rewriting TS segments to route through our server.
-    """
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-    if "referer" in url:
-         headers["Referer"] = "https://kinopoisk.ru/" # Basic referer if needed
-
-    try:
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True, headers=headers) as client:
-            resp = await client.get(url)
-            if resp.status_code != 200:
-                raise HTTPException(status_code=resp.status_code, detail="Failed to fetch playlist")
-            
-            content = resp.text
-            base_url = url.rsplit("/", 1)[0]
-            
-            new_lines = []
-            for line in content.splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                if line.startswith("#"):
-                    new_lines.append(line)
-                else:
-                    # It's a segment or sub-playlist
-                    full_segment_url = line
-                    if not line.startswith("http"):
-                        full_segment_url = f"{base_url}/{line}"
-                    
-                    # Encode for query param
-                    import urllib.parse
-                    encoded_seg = urllib.parse.quote(full_segment_url)
-                    
-                    # Route through our segment proxy
-                    # We assume relative path context or absolute path to api
-                    # Since frontend calls this, we return relative API path
-                    new_lines.append(f"/api/video/segment?url={encoded_seg}")
-            
-            return Response(content="\n".join(new_lines), media_type="application/vnd.apple.mpegurl")
-
-    except Exception as e:
-        print(f"Proxy M3U8 Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/video/segment")
-async def proxy_segment(url: str):
-    """
-    Proxies the actual video segment (TS file).
-    Streamed directly to client to save memory.
-    """
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-    
-    async def iterfile():
-        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, headers=headers) as client:
-            async with client.stream("GET", url) as req:
-                async for chunk in req.aiter_bytes():
-                    yield chunk
-                    
-    return StreamingResponse(iterfile(), media_type="video/mp2t")
+    return HTMLResponse(content=html_content)
 
 # Serve Frontend - Disabled for Dev (Vite)
 # app.mount("/", StaticFiles(directory="../frontend/dist", html=True), name="static")
