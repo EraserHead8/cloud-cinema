@@ -1,102 +1,30 @@
-import React, { useEffect, useRef, useState } from 'react';
-import videojs from 'video.js';
-import 'video.js/dist/video-js.css';
+import React from 'react';
 
 const VideoPlayer = ({ movie, isOpen, onClose }) => {
-    const videoRef = useRef(null);
-    const playerRef = useRef(null);
-    const [streamUrl, setStreamUrl] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-
-    // Clean KP ID
-    const kpId = movie?.video_url?.replace(/\D/g, '');
-
-    // Fetch Stream from Backend (Vibix Proxy)
-    useEffect(() => {
-        if (!isOpen || !kpId) return;
-
-        const fetchStream = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                const response = await fetch(`/api/get-stream/${kpId}`);
-                if (!response.ok) throw new Error("Stream not available");
-                const data = await response.json();
-
-                if (data.url) {
-                    setStreamUrl(data.url);
-                } else {
-                    throw new Error("Invalid response from server");
-                }
-            } catch (err) {
-                console.error("Stream fetch error:", err);
-                setError("Не удалось загрузить поток. Попробуйте позже.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchStream();
-    }, [isOpen, kpId]);
-
-    // Initialize Video.js
-    useEffect(() => {
-        if (streamUrl && videoRef.current) {
-            playerRef.current = videojs(videoRef.current, {
-                controls: true,
-                autoplay: true,
-                preload: 'auto',
-                fluid: true,
-                sources: [{
-                    src: streamUrl,
-                    type: 'application/x-mpegURL'
-                }]
-            });
-
-            // Cleanup
-            return () => {
-                if (playerRef.current) {
-                    playerRef.current.dispose();
-                    playerRef.current = null;
-                }
-            };
-        }
-    }, [streamUrl]);
-
     if (!isOpen || !movie) return null;
 
+    // Очищаем ID от префикса KP: и букв
+    const cleanId = movie.video_url?.replace(/\D/g, '');
+
+    // Используем зеркало, которое лучше всего работает в РФ/СНГ (как в LazyMedia)
+    const playerUrl = `https://1236812837.svetaapi.com/video/kp/${cleanId}`;
+
     return (
-        <div className="fixed inset-0 bg-black/95 z-50 flex flex-col highlight-white/5">
+        <div className="fixed inset-0 bg-black/95 z-50 flex flex-col">
             <div className="flex justify-between items-center p-4 bg-zinc-900 border-b border-zinc-800">
-                <h2 className="text-white text-xl font-bold">{movie.title}</h2>
-                <button
-                    onClick={onClose}
-                    className="text-white hover:text-red-500 text-3xl px-4 transition-colors"
-                >
-                    ✕
-                </button>
+                <h2 className="text-white font-bold">{movie.title}</h2>
+                <button onClick={onClose} className="text-white text-2xl px-4 hover:text-red-500">✕</button>
             </div>
-
-            <div className="flex-1 w-full bg-black relative flex items-center justify-center">
-                {loading && <div className="text-white text-lg animate-pulse">Загрузка потока через прокси...</div>}
-
-                {error && (
-                    <div className="text-red-500 text-center p-4">
-                        <p className="font-bold text-xl mb-2">Ошибка</p>
-                        <p>{error}</p>
-                        <p className="text-sm text-zinc-500 mt-2">ID: {kpId}</p>
-                    </div>
-                )}
-
-                {!loading && !error && streamUrl && (
-                    <div data-vjs-player className="w-full h-full">
-                        <video
-                            ref={videoRef}
-                            className="video-js vjs-big-play-centered w-full h-full"
-                        />
-                    </div>
-                )}
+            <div className="flex-1 bg-black relative">
+                <iframe
+                    key={cleanId}
+                    src={playerUrl}
+                    className="w-full h-full border-0"
+                    allowFullScreen
+                    // КРИТИЧЕСКИ ВАЖНО для обхода блокировок:
+                    referrerPolicy="no-referrer"
+                    sandbox="allow-forms allow-scripts allow-same-origin allow-presentation"
+                ></iframe>
             </div>
         </div>
     );

@@ -183,7 +183,9 @@ def clear_all_movies(
     # Cancel any pending search tasks for this user (conceptually, though we don't have a background task manager for searches explicitly exposed here)
     if current_user.id in USER_SEARCH_RESULTS:
         del USER_SEARCH_RESULTS[current_user.id]
-    return {"status": "success", "message": "Library cleared"}
+    if current_user.id in USER_SEARCH_RESULTS:
+        del USER_SEARCH_RESULTS[current_user.id]
+    return []
 
 
 @app.delete("/api/movies/{movie_id}")
