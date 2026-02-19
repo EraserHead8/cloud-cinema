@@ -244,51 +244,57 @@ async def get_player_url(kp: str):
         except Exception as e:
             print(f"VideoCDN API error: {e}")
 
-@app.get("/api/get-stream/{kp_id}")
-async def get_stream(kp_id: str):
+@app.get("/api/video-stream/{kp_id}")
+async def get_video_stream(kp_id: str):
     """
-    Fetch direct stream link from Vibix (vapi.vbxis.ru).
+    Fetch direct .m3u8 stream link from Collaps or Kodik.
     Bypasses ISP blocks by proxying the request server-side.
     """
-    # Masquerade as a real browser
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Referer": "https://kinopoisk.ru/"
     }
     
     async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, headers=headers) as client:
+        # 1. Try Collaps (usually high quality, easier to parse)
         try:
-            # Request to Vibix API
-            url = f"https://vapi.vbxis.ru/api/player/kp/{kp_id}"
-            resp = await client.get(url)
-            
-            # Vibix usually returns JSON with "data" or "url"
-            # If it returns HTML, we might need to parse.
-            # Assuming JSON based on user request "извлекает прямую ссылку".
-            
-            # Try to parse as JSON
-            try:
-                data = resp.json()
-                # Check for common fields
-                stream_url = data.get("url") or data.get("file") or data.get("src")
-                if stream_url:
-                    return {"url": stream_url}
-            except:
-                pass
-            
-            # Fallback: Check if response text IS the url or contains it
-            content = resp.text
-            if content.startswith("http") and ".m3u8" in content:
-                return {"url": content.strip()}
-            
-            # Regex search for .m3u8 in content (if it serves a player page)
-            import re
-            match = re.search(r"[\"'](https?://.*?\.m3u8.*?)[\"']", content)
-            if match:
-                return {"url": match.group(1)}
-                
+            # Note: Collaps API/Mirror might vary. Using a known mirror pattern.
+            resp = await client.get(f"https://api.strvid.ws/embed/movie/{kp_id}")
+            if resp.status_code == 200:
+                content = resp.text
+                # Look for .m3u8 in content
+                import re
+                match = re.search(r"file:[\s\"']+(https?://.*?\.m3u8.*?)[\"']", content)
+                if match:
+                    return {"url": match.group(1)}
+                match_src = re.search(r"src:[\s\"']+(https?://.*?\.m3u8.*?)[\"']", content)
+                if match_src:
+                    return {"url": match_src.group(1)}
         except Exception as e:
-            print(f"Vibix stream error: {e}")
+            print(f"Collaps parser error: {e}")
+
+        # 2. Try Kodik (Backup)
+        try:
+            resp = await client.get(
+                f"https://kodikapi.com/search?token={KODIK_TOKEN}&kinopoisk_id={kp_id}"
+            )
+            data = resp.json()
+            if data.get("results") and len(data["results"]) > 0:
+                link = data["results"][0]["link"]
+                if link.startswith("//"):
+                    link = "https:" + link
+                
+                # Fetch Kodik iframe
+                iframe_resp = await client.get(link)
+                content = iframe_resp.text
+                
+                # Try to find .m3u8
+                import re
+                match = re.search(r"[\"'](https?://.*?\.m3u8.*?)[\"']", content)
+                if match:
+                    return {"url": match.group(1)}
+        except Exception as e:
+            print(f"Kodik parser error: {e}")
 
     raise HTTPException(status_code=404, detail="Stream not found")
 
