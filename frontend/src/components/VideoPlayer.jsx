@@ -3,10 +3,14 @@ import React from 'react';
 const VideoPlayer = ({ movie, isOpen, onClose }) => {
     if (!isOpen || !movie) return null;
 
-    const kpId = movie.video_url?.startsWith('KP:') ? movie.video_url.replace('KP:', '') : movie.video_url;
+    // Извлекаем только цифры ID
+    const kpId = movie.video_url?.replace(/\D/g, '');
 
-    // vidsrc.cc сейчас работает стабильнее в РФ, чем xyz
-    const playerSrc = `https://vidsrc.cc/v2/embed/movie/${kpId}`;
+    // Логируем в консоль для проверки (пользователь увидит в F12)
+    console.log("Initiating player for KP ID:", kpId);
+
+    // Используем самый стабильный агрегатор vidsrc.me
+    const playerSrc = `https://vidsrc.me/embed/movie?kp=${kpId}`;
 
     return (
         <div className="fixed inset-0 bg-black/95 z-50 flex flex-col highlight-white/5">
@@ -14,7 +18,7 @@ const VideoPlayer = ({ movie, isOpen, onClose }) => {
                 <h2 className="text-white text-xl font-bold">{movie.title}</h2>
                 <button
                     onClick={onClose}
-                    className="text-white hover:text-red-500 text-2xl px-4 transition-colors"
+                    className="text-white hover:text-red-500 text-3xl px-4 transition-colors"
                 >
                     ✕
                 </button>
@@ -22,13 +26,11 @@ const VideoPlayer = ({ movie, isOpen, onClose }) => {
 
             <div className="flex-1 w-full bg-black relative">
                 <iframe
+                    key={kpId} // КРИТИЧЕСКИ ВАЖНО: заставляет iframe обновиться
                     src={playerSrc}
                     className="w-full h-full border-0 absolute inset-0"
                     allowFullScreen
-                    webkitallowfullscreen="true"
-                    mozallowfullscreen="true"
-                    allow="autoplay; encrypted-media; picture-in-picture"
-                    // Sandbox без allow-top-navigation, чтобы не было редиректов на рекламу
+                    allow="autoplay; encrypted-media"
                     sandbox="allow-forms allow-scripts allow-same-origin allow-presentation"
                     title={`Player for ${movie.title}`}
                 ></iframe>
