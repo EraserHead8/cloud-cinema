@@ -244,8 +244,117 @@ async def get_player_url(kp: str):
         except Exception as e:
             print(f"VideoCDN API error: {e}")
 
-# Obsolete proxy endpoints removed.
-# The Nginx Reverse Proxy now handles video traffic directly.
+from fastapi.responses import StreamingResponse, Response
+import urllib.parse
+
+@app.get("/api/video/source/{kp_id}")
+async def get_video_source(kp_id: str):
+    """
+    Fetch direct .m3u8 stream link from Collaps/Shiza.
+    Returns {"url": "..."} to be used by the proxy.
+    """
+    if not kp_id or not kp_id.isdigit():
+         raise HTTPException(status_code=400, detail="Invalid Kinopoisk ID")
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://kinopoisk.ru/"
+    }
+    
+    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, headers=headers) as client:
+        try:
+            # Request to Collaps Mirror
+            resp = await client.get(f"https://api.strvid.ws/embed/movie/{kp_id}")
+            if resp.status_code == 200:
+                content = resp.text
+                
+                # Check for direct file patterns in source (Collaps)
+                import re
+                
+                # Pattern 1: file: "..."
+                match = re.search(r"file:[\s\"']+(https?://.*?\.m3u8.*?)[\"']", content)
+                if match:
+                    return {"url": match.group(1)}
+                
+                # Pattern 2: src: "..."
+                match_src = re.search(r"src:[\s\"']+(https?://.*?\.m3u8.*?)[\"']", content)
+                if match_src:
+                    return {"url": match_src.group(1)}
+                    
+                # Pattern 3: source src="..."
+                match_source = re.search(r"<source[^>]+src=[\"'](https?://.*?\.m3u8.*?)[\"']", content)
+                if match_source:
+                    return {"url": match_source.group(1)}
+
+        except Exception as e:
+            print(f"Collaps source error: {e}")
+
+    raise HTTPException(status_code=404, detail="Источник не найден (Collaps/Shiza)")
+
+@app.get("/api/proxy-stream")
+async def proxy_stream(url: str):
+    """
+    Universal Proxy for HLS (m3u8 playlists and TS segments).
+    Rewrites playlist content to route segments through this same endpoint.
+    Streams binary content directly.
+    """
+    if not url:
+        raise HTTPException(status_code=400, detail="URL required")
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        # Some CDNs check referer. Usually the provider's domain or null is safest.
+        # "Referer": "https://shiza.libdoor.cyou/" 
+    }
+
+    try:
+        # We need to determine if we should rewrite (playlist) or stream (segment)
+        # Simple heuristic: check extension or query
+        is_playlist = ".m3u8" in url
+
+        if is_playlist:
+            # Fetch and rewrite
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True, headers=headers) as client:
+                resp = await client.get(url)
+                if resp.status_code != 200:
+                    raise HTTPException(status_code=resp.status_code, detail="Failed to fetch playlist")
+                
+                content = resp.text
+                base_url = url.rsplit("/", 1)[0]
+                
+                new_lines = []
+                for line in content.splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    if line.startswith("#"):
+                        new_lines.append(line)
+                    else:
+                        # It's a segment or sub-playlist
+                        full_seg_url = line
+                        if not line.startswith("http"):
+                            full_seg_url = f"{base_url}/{line}"
+                        
+                        # Encode logic for recursion
+                        encoded_seg = urllib.parse.quote(full_seg_url)
+                        new_lines.append(f"/api/proxy-stream?url={encoded_seg}")
+                
+                return Response(content="\n".join(new_lines), media_type="application/vnd.apple.mpegurl")
+        
+        else:
+            # Stream segment (Binary)
+            async def iterfile():
+                async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, headers=headers) as client:
+                    async with client.stream("GET", url) as req:
+                        async for chunk in req.aiter_bytes():
+                            yield chunk
+                            
+            # Attempt to guess media type, fallback to binary or mp2t
+            return StreamingResponse(iterfile(), media_type="video/mp2t")
+
+    except Exception as e:
+        print(f"Proxy Stream Error: {e}")
+        raise HTTPException(status_code=500, detail=str(url))
 
 # Serve Frontend - Disabled for Dev (Vite)
 # app.mount("/", StaticFiles(directory="../frontend/dist", html=True), name="static")
