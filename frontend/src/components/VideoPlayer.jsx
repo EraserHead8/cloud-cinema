@@ -1,110 +1,58 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import axios from '../api'; // Use our api instance
+// video.js import is kept for potential future direct stream support, 
+// but currently we use iframe as per Vibix requirement.
+import 'video.js/dist/video-js.css';
 
 const VideoPlayer = ({ movie, isOpen, onClose }) => {
-    const containerRef = useRef(null);
+    const [streamUrl, setStreamUrl] = useState(null);
+    // videoRef is unused for iframe approach but kept for structure compliance if needed later
+    const videoRef = useRef(null);
 
     useEffect(() => {
         if (!isOpen || !movie) return;
 
-        // Remove 'KP:' prefix to get clean ID
         const kpId = movie.video_url?.startsWith('KP:') ? movie.video_url.replace('KP:', '') : null;
-
         if (!kpId) return;
 
-        let observer = null;
-
-        const initKinobox = () => {
-            // Check if kbox is available globally and container exists
-            if (typeof window.kbox !== 'undefined' && containerRef.current) {
-                try {
-                    // Clear container before init to prevent duplicates
-                    containerRef.current.innerHTML = '';
-
-                    // --- SANDBOX HACK START ---
-                    // Watch for iframe creation and apply sandbox attributes to prevent redirects
-                    observer = new MutationObserver((mutations) => {
-                        const applySandbox = (node) => {
-                            if (node.tagName === 'IFRAME') {
-                                // Missing 'allow-top-navigation' prevents the iframe from redirecting the main window
-                                node.setAttribute('sandbox', 'allow-forms allow-scripts allow-same-origin allow-presentation');
-                            }
-                            if (node.querySelectorAll) {
-                                node.querySelectorAll('iframe').forEach(iframe => {
-                                    iframe.setAttribute('sandbox', 'allow-forms allow-scripts allow-same-origin allow-presentation');
-                                });
-                            }
-                        };
-                        mutations.forEach(m => m.addedNodes.forEach(applySandbox));
-                    });
-                    observer.observe(containerRef.current, { childList: true, subtree: true });
-                    // --- SANDBOX HACK END ---
-
-                    window.kbox(containerRef.current, {
-                        search: { kinopoisk: kpId },
-                        menu: { enable: true, default: 'menu_list' },
-                        players: {
-                            alloha: { enable: true },
-                            kodik: { enable: true },
-                            collaps: { enable: true }
-                        },
-                        params: {
-                            all: {
-                                domain: "https://kinobox.tv",
-                                referrer: "https://www.google.com"
-                            }
-                        }
-                    });
-                } catch (e) {
-                    console.error("Kinobox init error:", e);
+        // Fetch stream URL from backend
+        axios.get(`/api/stream/${kpId}`)
+            .then(response => {
+                if (response.data && response.data.url) {
+                    setStreamUrl(response.data.url);
                 }
-            }
-        };
+            })
+            .catch(error => {
+                console.error("Error fetching stream:", error);
+            });
 
-        // Dynamically load script if not present
-        if (!document.getElementById('kinobox-script')) {
-            const script = document.createElement('script');
-            script.id = 'kinobox-script';
-            script.src = 'https://kinobox.tv/kinobox.min.js';
-            script.async = true;
-            script.onload = initKinobox;
-            document.body.appendChild(script);
-        } else {
-            // If script already loaded, just init for new movie
-            initKinobox();
-        }
-
+        // Cleanup not strictly needed for iframe source, but good practice if we used video.js
         return () => {
-            if (observer) observer.disconnect();
+            setStreamUrl(null);
         };
-
     }, [isOpen, movie]);
 
     if (!isOpen || !movie) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/95 z-50 flex flex-col animate-in fade-in duration-300">
-            {/* Header */}
-            <div className="flex justify-between items-center p-4 bg-zinc-900/90 backdrop-blur border-b border-zinc-800 z-10">
-                <h2 className="text-white text-lg md:text-xl font-bold truncate max-w-[80%]">
-                    {movie.title}
-                </h2>
-                <button
-                    onClick={onClose}
-                    className="text-zinc-400 hover:text-white bg-zinc-800/50 hover:bg-red-600/20 hover:border-red-500 border border-zinc-700 rounded-full w-10 h-10 flex items-center justify-center transition-all"
-                >
-                    ✕
+        <div className="fixed inset-0 bg-black z-50 flex flex-col animate-in fade-in duration-300">
+            <div className="p-4 flex justify-between items-center bg-zinc-900 border-b border-zinc-800">
+                <h2 className="text-white text-lg font-bold">{movie.title}</h2>
+                <button onClick={onClose} className="text-zinc-400 hover:text-red-500 transition-colors">
+                    ✕ ЗАКРЫТЬ
                 </button>
             </div>
-
-            {/* Player Container */}
-            <div className="flex-1 w-full relative bg-black flex items-center justify-center overflow-hidden">
-                {movie.video_url?.startsWith('KP:') ? (
-                    <div ref={containerRef} className="kinobox_player w-full h-full"></div>
+            <div className="flex-1 relative bg-black flex items-center justify-center">
+                {streamUrl ? (
+                    <iframe
+                        src={streamUrl}
+                        className="w-full h-full border-0"
+                        allowFullScreen
+                        allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                        title={movie.title}
+                    />
                 ) : (
-                    <div className="text-white/50 text-xl flex flex-col items-center gap-2">
-                        <span>⚠️</span>
-                        <span>ID Кинопоиска не найден</span>
-                    </div>
+                    <div className="text-white/50">Загрузка плеера...</div>
                 )}
             </div>
         </div>
