@@ -1,16 +1,16 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 const VideoPlayer = ({ movie, isOpen, onClose }) => {
     if (!isOpen || !movie) return null;
 
     // Извлекаем только цифры ID
-    const kpId = movie.video_url?.replace(/\D/g, '');
+    const cleanId = movie.video_url?.replace(/\D/g, '');
 
     // Логируем в консоль для проверки (пользователь увидит в F12)
-    console.log("Initiating player for KP ID:", kpId);
+    console.log("Initiating Kodik player for ID:", cleanId);
 
-    // Используем самый стабильный агрегатор vidsrc.me
-    const playerSrc = `https://vidsrc.me/embed/movie?kp=${kpId}`;
+    // Используем стабильное зеркало Kodik
+    const playerSrc = `https://shiza.libdoor.cyou/serial/kp/${cleanId}/iframe`;
 
     return (
         <div className="fixed inset-0 bg-black/95 z-50 flex flex-col highlight-white/5">
@@ -26,11 +26,13 @@ const VideoPlayer = ({ movie, isOpen, onClose }) => {
 
             <div className="flex-1 w-full bg-black relative">
                 <iframe
-                    key={kpId} // КРИТИЧЕСКИ ВАЖНО: заставляет iframe обновиться
+                    key={cleanId} // КРИТИЧЕСКИ ВАЖНО: заставляет iframe обновиться
                     src={playerSrc}
                     className="w-full h-full border-0 absolute inset-0"
                     allowFullScreen
-                    allow="autoplay; encrypted-media"
+                    allow="autoplay; encrypted-media; fullscreen"
+                    // Kodik требует определенных разрешений, sandbox может ломать его, но попробуем оставить минимальный
+                    // Если не заработает - уберем sandbox
                     sandbox="allow-forms allow-scripts allow-same-origin allow-presentation"
                     title={`Player for ${movie.title}`}
                 ></iframe>

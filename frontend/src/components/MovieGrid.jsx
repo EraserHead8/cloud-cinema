@@ -3,7 +3,8 @@ import VideoPlayer from './VideoPlayer';
 import MovieCard from './MovieCard';
 import { Play } from 'lucide-react';
 
-const MovieGrid = ({ movies }) => {
+const MovieGrid = (props) => {
+    const { movies } = props;
     const firstCardRef = useRef(null);
     const [selectedMovie, setSelectedMovie] = useState(null);
 
@@ -47,6 +48,7 @@ const MovieGrid = ({ movies }) => {
                         firstCardRef={firstCardRef}
                         onClick={setSelectedMovie}
                         onKeyDown={(e, m) => e.key === 'Enter' && setSelectedMovie(m)}
+                        onDelete={props.onDelete}
                     />
                 ))}
             </div>

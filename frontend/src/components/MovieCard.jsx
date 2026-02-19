@@ -1,7 +1,7 @@
 import React from 'react';
 import { Play } from 'lucide-react';
 
-const MovieCard = ({ movie, onClick, onKeyDown, isFirst, firstCardRef }) => {
+const MovieCard = ({ movie, onClick, onKeyDown, isFirst, firstCardRef, onDelete }) => {
     const getStatusBadge = (movie) => {
         if (movie.status === 'error_no_source') {
             return <span className="text-[10px] font-bold tracking-wider text-white bg-red-600 px-1.5 py-0.5 rounded-sm uppercase">ОШИБКА</span>;
@@ -54,6 +54,18 @@ const MovieCard = ({ movie, onClick, onKeyDown, isFirst, firstCardRef }) => {
                     <Play fill="white" className="text-white w-8 h-8 ml-1" />
                 </div>
             </div>
+
+            {/* Delete Button (Top Right) */}
+            <button
+                onClick={(e) => {
+                    e.stopPropagation(); // Prevent card click
+                    onDelete && onDelete(movie);
+                }}
+                className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center bg-black/50 hover:bg-red-600 rounded-full text-white/70 hover:text-white opacity-0 group-hover:opacity-100 transition-all z-50 backdrop-blur-sm"
+                title="Удалить"
+            >
+                ✕
+            </button>
         </div>
     );
 };

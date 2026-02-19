@@ -172,6 +172,40 @@ def get_library(
     return db.query(models.Movie).filter(models.Movie.user_id == current_user.id).all()
 
 
+@app.delete("/api/movies/clear-all")
+def clear_all_movies(
+    db: Session = Depends(auth.get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """Delete all movies from user's library."""
+    db.query(models.Movie).filter(models.Movie.user_id == current_user.id).delete()
+    db.commit()
+    # Cancel any pending search tasks for this user (conceptually, though we don't have a background task manager for searches explicitly exposed here)
+    if current_user.id in USER_SEARCH_RESULTS:
+        del USER_SEARCH_RESULTS[current_user.id]
+    return {"status": "success", "message": "Library cleared"}
+
+
+@app.delete("/api/movies/{movie_id}")
+def delete_movie(
+    movie_id: int,
+    db: Session = Depends(auth.get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """Delete a specific movie."""
+    movie = db.query(models.Movie).filter(
+        models.Movie.id == movie_id,
+        models.Movie.user_id == current_user.id
+    ).first()
+    
+    if not movie:
+        raise HTTPException(status_code=404, detail="Movie not found")
+        
+    db.delete(movie)
+    db.commit()
+    return {"status": "success", "message": "Movie deleted"}
+
+
 # --- PLAYER URL PROXY (bypasses CORS) ---
 KODIK_TOKEN = "b46255e5d48348259441113580456181"
 VCDN_TOKEN = "3i40G5TVIWKtBMGEHG9RiuKCJXv0F799"

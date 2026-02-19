@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import MovieGrid from './components/MovieGrid';
 import AdminPanel from './components/AdminPanel';
 import Auth from './components/Auth';
-import { getLibrary } from './api';
+import { getLibrary, deleteMovie, clearLibrary } from './api';
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
@@ -46,6 +46,30 @@ function App() {
     setMovies([]);
   };
 
+  const handleDeleteMovie = async (movie) => {
+    if (confirm(`Удалить фильм "${movie.title}"?`)) {
+      try {
+        await deleteMovie(movie.id);
+        setMovies(prev => prev.filter(m => m.id !== movie.id));
+      } catch (e) {
+        console.error("Failed to delete movie", e);
+        alert("Ошибка удаления");
+      }
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (confirm("Вы уверены? Это удалит ВСЕ фильмы из вашей библиотеки.")) {
+      try {
+        await clearLibrary();
+        setMovies([]);
+      } catch (e) {
+        console.error("Failed to clear library", e);
+        alert("Ошибка очистки");
+      }
+    }
+  };
+
   // --- AUTH GATE ---
   if (!token) {
     return <Auth onLogin={(t) => setToken(t)} />;
@@ -72,10 +96,16 @@ function App() {
             >
               Выйти
             </button>
+            <button
+              onClick={handleClearAll}
+              className="text-xs font-bold tracking-widest text-white/50 hover:text-white uppercase border border-white/10 hover:border-white/30 px-3 py-1 rounded-full transition-colors"
+            >
+              Очистить всё
+            </button>
           </div>
         </header>
         <main>
-          <MovieGrid movies={movies} />
+          <MovieGrid movies={movies} onDelete={handleDeleteMovie} />
         </main>
       </div>
     </div>
