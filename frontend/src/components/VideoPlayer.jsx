@@ -11,6 +11,8 @@ const VideoPlayer = ({ movie, isOpen, onClose }) => {
 
         if (!kpId) return;
 
+        let observer = null;
+
         const initKinobox = () => {
             // Check if kbox is available globally and container exists
             if (typeof window.kbox !== 'undefined' && containerRef.current) {
@@ -18,24 +20,37 @@ const VideoPlayer = ({ movie, isOpen, onClose }) => {
                     // Clear container before init to prevent duplicates
                     containerRef.current.innerHTML = '';
 
+                    // --- SANDBOX HACK START ---
+                    // Watch for iframe creation and apply sandbox attributes to prevent redirects
+                    observer = new MutationObserver((mutations) => {
+                        const applySandbox = (node) => {
+                            if (node.tagName === 'IFRAME') {
+                                // Missing 'allow-top-navigation' prevents the iframe from redirecting the main window
+                                node.setAttribute('sandbox', 'allow-forms allow-scripts allow-same-origin allow-presentation');
+                            }
+                            if (node.querySelectorAll) {
+                                node.querySelectorAll('iframe').forEach(iframe => {
+                                    iframe.setAttribute('sandbox', 'allow-forms allow-scripts allow-same-origin allow-presentation');
+                                });
+                            }
+                        };
+                        mutations.forEach(m => m.addedNodes.forEach(applySandbox));
+                    });
+                    observer.observe(containerRef.current, { childList: true, subtree: true });
+                    // --- SANDBOX HACK END ---
+
                     window.kbox(containerRef.current, {
                         search: { kinopoisk: kpId },
                         menu: { enable: true, default: 'menu_list' },
                         players: {
                             alloha: { enable: true },
                             kodik: { enable: true },
-                            videocdn: { enable: true },
                             collaps: { enable: true }
                         },
                         params: {
                             all: {
-                                // Force domain to bypass block
                                 domain: "https://kinobox.tv",
                                 referrer: "https://www.google.com"
-                            },
-                            kodik: {
-                                // Strict proxying for Kodik
-                                strict: true
                             }
                         }
                     });
@@ -57,6 +72,10 @@ const VideoPlayer = ({ movie, isOpen, onClose }) => {
             // If script already loaded, just init for new movie
             initKinobox();
         }
+
+        return () => {
+            if (observer) observer.disconnect();
+        };
 
     }, [isOpen, movie]);
 
