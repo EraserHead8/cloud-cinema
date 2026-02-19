@@ -244,41 +244,8 @@ async def get_player_url(kp: str):
         except Exception as e:
             print(f"VideoCDN API error: {e}")
 
-from fastapi.responses import HTMLResponse
-
-@app.get("/api/proxy-player", response_class=HTMLResponse)
-async def proxy_player(kp_id: str):
-    """
-    Returns an HTML page with an iframe to the video provider (Shiza/Collaps).
-    Embeds 'no-referrer' meta tag to hide the source origin from the provider.
-    This bypasses blocking by making the request appear direct but anonymous.
-    """
-    if not kp_id or not kp_id.isdigit():
-        return HTMLResponse(content="<h1>Invalid ID</h1>", status_code=400)
-
-    html_content = f"""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta name="referrer" content="no-referrer">
-        <title>Player</title>
-        <style>
-            body, html {{ margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }}
-            iframe {{ width: 100%; height: 100%; border: none; }}
-        </style>
-    </head>
-    <body>
-        <iframe 
-            src="https://shiza.libdoor.cyou/video/kp/{kp_id}" 
-            allowfullscreen 
-            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-        ></iframe>
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html_content)
+# Obsolete proxy endpoints removed.
+# The Nginx Reverse Proxy now handles video traffic directly.
 
 # Serve Frontend - Disabled for Dev (Vite)
 # app.mount("/", StaticFiles(directory="../frontend/dist", html=True), name="static")
