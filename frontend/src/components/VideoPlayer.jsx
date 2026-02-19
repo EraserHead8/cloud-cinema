@@ -12,7 +12,7 @@ const VideoPlayer = ({ movie, isOpen, onClose }) => {
     // Clean KP ID
     const kpId = movie?.video_url?.replace(/\D/g, '');
 
-    // Fetch Stream from Backend (Collaps Proxy)
+    // Fetch Stream from Backend (HLS Parser)
     useEffect(() => {
         if (!isOpen || !kpId) return;
 
@@ -31,7 +31,7 @@ const VideoPlayer = ({ movie, isOpen, onClose }) => {
                 }
             } catch (err) {
                 console.error("Stream fetch error:", err);
-                setError("Не удалось найти поток (Collaps Proxy). Попробуйте позже.");
+                setError("Не удалось найти прямой поток. Разблокировка не сработала.");
             } finally {
                 setLoading(false);
             }
@@ -85,7 +85,7 @@ const VideoPlayer = ({ movie, isOpen, onClose }) => {
             </div>
 
             <div className="flex-1 w-full bg-black relative flex items-center justify-center">
-                {loading && <div className="text-white text-lg animate-pulse">Запрос потока через прокси...</div>}
+                {loading && <div className="text-white text-lg animate-pulse">Парсинг HLS потока (VideoCDN/Collaps)...</div>}
 
                 {error && (
                     <div className="text-red-500 text-center p-4">

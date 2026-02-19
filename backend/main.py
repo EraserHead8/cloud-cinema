@@ -247,7 +247,7 @@ async def get_player_url(kp: str):
 @app.get("/api/get-stream/{kp_id}")
 async def get_stream(kp_id: str):
     """
-    Fetch direct .m3u8 stream link from Collaps (strvid.ws).
+    Fetch direct .m3u8 stream link from VideoCDN or Collaps (HLS Parser).
     Bypasses ISP blocks by proxying the request server-side.
     """
     headers = {
@@ -256,15 +256,37 @@ async def get_stream(kp_id: str):
     }
     
     async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, headers=headers) as client:
+        # 1. Try VideoCDN (often has direct files in API if allowed)
+        try:
+            resp = await client.get(
+                f"https://videocdn.tv/api/short?api_token={VCDN_TOKEN}&kinopoisk_id={kp_id}"
+            )
+            data = resp.json()
+            if data.get("data") and len(data["data"]) > 0:
+                iframe_src = data["data"][0]["iframe_src"]
+                if iframe_src.startswith("//"):
+                    iframe_src = "https:" + iframe_src
+                
+                # Fetch iframe content
+                iframe_resp = await client.get(iframe_src)
+                content = iframe_resp.text
+                
+                # Simple regex for .m3u8
+                import re
+                match = re.search(r"[\"'](https?://.*?\.m3u8.*?)[\"']", content)
+                if match:
+                    return {"url": match.group(1)}
+        except Exception as e:
+            print(f"VideoCDN stream error: {e}")
+
+        # 2. Try Collaps (Backup)
         try:
             # Request to Collaps Mirror
             resp = await client.get(f"https://api.strvid.ws/embed/movie/{kp_id}")
             if resp.status_code == 200:
                 content = resp.text
                 
-                # Check for direct file patterns in source
                 import re
-                
                 # Pattern 1: file: "..."
                 match = re.search(r"file:[\s\"']+(https?://.*?\.m3u8.*?)[\"']", content)
                 if match:
@@ -274,14 +296,9 @@ async def get_stream(kp_id: str):
                 match_src = re.search(r"src:[\s\"']+(https?://.*?\.m3u8.*?)[\"']", content)
                 if match_src:
                     return {"url": match_src.group(1)}
-                    
-                # Pattern 3: source src="..."
-                match_source = re.search(r"<source[^>]+src=[\"'](https?://.*?\.m3u8.*?)[\"']", content)
-                if match_source:
-                    return {"url": match_source.group(1)}
 
         except Exception as e:
-            print(f"Collaps proxy error: {e}")
+            print(f"Collaps parser error: {e}")
 
     raise HTTPException(status_code=404, detail="Stream not found")
 
