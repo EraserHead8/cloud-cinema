@@ -242,7 +242,73 @@ async def get_player_url(kp: str):
         except Exception as e:
             print(f"VideoCDN API error: {e}")
 
-    raise HTTPException(status_code=404, detail="Player not found")
+@app.get("/api/stream-link/{kp_id}")
+async def get_stream_link(kp_id: str):
+    """
+    Experimental: Fetch direct .m3u8 stream link from VideoCDN/Kodik.
+    This bypasses client-side blocking by proxying the initial manifest request.
+    """
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://kinopoisk.ru/"
+    }
+    
+    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, headers=headers) as client:
+        # 1. Try VideoCDN (often has direct files in API if allowed)
+        try:
+            resp = await client.get(
+                f"https://videocdn.tv/api/short?api_token={VCDN_TOKEN}&kinopoisk_id={kp_id}"
+            )
+            data = resp.json()
+            if data.get("data") and len(data["data"]) > 0:
+                iframe_src = data["data"][0]["iframe_src"]
+                # If we get an iframe, we might need to parse it. 
+                # Ideally, we'd find a direct link API, but for now we return the iframe URL 
+                # and let the frontend try to handle it or use a known reliable source.
+                # HOWEVER, the user asked for .m3u8. 
+                # VideoCDN sometimes exposes it via a different endpoint but it's protected.
+                # Let's try to fetch the iframe content and look for 'file': '...' or .m3u8
+                if iframe_src.startswith("//"):
+                    iframe_src = "https:" + iframe_src
+                
+                # Fetch iframe content
+                iframe_resp = await client.get(iframe_src)
+                content = iframe_resp.text
+                
+                # Simple regex for .m3u8
+                import re
+                match = re.search(r"[\"'](https?://.*?\.m3u8.*?)[\"']", content)
+                if match:
+                    return {"url": match.group(1)}
+        except Exception as e:
+            print(f"VideoCDN stream error: {e}")
+
+        # 2. Try Kodik
+        try:
+            resp = await client.get(
+                f"https://kodikapi.com/search?token={KODIK_TOKEN}&kinopoisk_id={kp_id}"
+            )
+            data = resp.json()
+            if data.get("results") and len(data["results"]) > 0:
+                link = data["results"][0]["link"]
+                if link.startswith("//"):
+                    link = "https:" + link
+                
+                # Fetch Kodik iframe
+                iframe_resp = await client.get(link)
+                content = iframe_resp.text
+                
+                # Kodik is harder, often obfuscated. 
+                # But sometimes they leave a direct link or a decoder is needed.
+                # For this task, we'll try a simple regex again.
+                import re
+                match = re.search(r"[\"'](https?://.*?\.m3u8.*?)[\"']", content)
+                if match:
+                    return {"url": match.group(1)}
+        except Exception as e:
+            print(f"Kodik stream error: {e}")
+
+    raise HTTPException(status_code=404, detail="Stream link not found")
 
 # Serve Frontend - Disabled for Dev (Vite)
 # app.mount("/", StaticFiles(directory="../frontend/dist", html=True), name="static")
