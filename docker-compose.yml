@@ -1,4 +1,4 @@
-version: '3.8'
+version: '3.3'
 
 services:
   backend:
@@ -6,7 +6,7 @@ services:
     container_name: cloud_cinema_backend
     restart: always
     volumes:
-      - ./sql_app.db:/app/sql_app.db  # Persist SQLite database
+      - ./sql_app.db:/app/sql_app.db # Persist SQLite database
     environment:
       - PYTHONUNBUFFERED=1
 
