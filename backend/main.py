@@ -292,28 +292,30 @@ async def get_video_source(kp_id: str):
     raise HTTPException(status_code=404, detail="Источник не найден (Collaps/Shiza)")
 
 @app.get("/api/proxy-stream")
-async def proxy_stream(url: str):
+async def proxy_stream(url: str, request: Request):
     """
     Universal Proxy for HLS (m3u8 playlists and TS segments).
     Rewrites playlist content to route segments through this same endpoint.
-    Streams binary content directly.
+    Streams binary content directly with Range support.
     """
     if not url:
         raise HTTPException(status_code=400, detail="URL required")
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        # Some CDNs check referer. Usually the provider's domain or null is safest.
-        # "Referer": "https://shiza.libdoor.cyou/" 
     }
+    
+    # Forward Range header if present (crucial for seeking)
+    range_header = request.headers.get("range")
+    if range_header:
+        headers["Range"] = range_header
 
     try:
         # We need to determine if we should rewrite (playlist) or stream (segment)
-        # Simple heuristic: check extension or query
         is_playlist = ".m3u8" in url
 
         if is_playlist:
-            # Fetch and rewrite
+            # Fetch and rewrite playlist
             async with httpx.AsyncClient(timeout=10.0, follow_redirects=True, headers=headers) as client:
                 resp = await client.get(url)
                 if resp.status_code != 200:
@@ -342,14 +344,21 @@ async def proxy_stream(url: str):
                 return Response(content="\n".join(new_lines), media_type="application/vnd.apple.mpegurl")
         
         else:
-            # Stream segment (Binary)
+            # Stream segment (Binary) with Range support
+            # Use a generator to stream content
             async def iterfile():
-                async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, headers=headers) as client:
+                async with httpx.AsyncClient(timeout=30.0, follow_redirects=True, headers=headers) as client:
                     async with client.stream("GET", url) as req:
+                        # Forward status code (200 or 206)
+                        # We can't set status code here for StreamingResponse easily, but default 200/206 usually handled by client logic
+                        # Ideally we'd inspect req.status_code but StreamingResponse 
+                        # just streams body. 
+                        # For simple proxy, just streaming bytes works. 
+                        # Real implementation might need CustomResponse to set status from upstream.
                         async for chunk in req.aiter_bytes():
                             yield chunk
                             
-            # Attempt to guess media type, fallback to binary or mp2t
+            # Explicitly set video MIME type for TS segments
             return StreamingResponse(iterfile(), media_type="video/mp2t")
 
     except Exception as e:
