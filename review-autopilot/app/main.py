@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta
 from pathlib import Path
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
@@ -19,10 +20,13 @@ from .models import (
 )
 from .services.google_gbp import build_auth_url, exchange_code, fetch_recent_reviews
 from .services.pipeline import process_review_job
+from .services.scheduler import autosync_loop, sync_connected_businesses_once
 from .services.stripe_gateway import create_checkout_session, parse_event, verify_webhook_signature
+from .settings import AUTO_SYNC_ENABLED, SYNC_INTERVAL_SECONDS
 
 app = FastAPI(title="AI Review Autopilot")
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+AUTOSYNC_TASK: asyncio.Task | None = None
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,12 +38,31 @@ app.add_middleware(
 
 @app.on_event("startup")
 def on_startup() -> None:
+    global AUTOSYNC_TASK
     Base.metadata.create_all(bind=engine)
+    if AUTO_SYNC_ENABLED:
+        AUTOSYNC_TASK = asyncio.create_task(autosync_loop(SYNC_INTERVAL_SECONDS))
+
+
+@app.on_event("shutdown")
+async def on_shutdown() -> None:
+    global AUTOSYNC_TASK
+    if AUTOSYNC_TASK:
+        AUTOSYNC_TASK.cancel()
+        try:
+            await AUTOSYNC_TASK
+        except asyncio.CancelledError:
+            pass
+        AUTOSYNC_TASK = None
 
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "autosync_enabled": AUTO_SYNC_ENABLED,
+        "sync_interval_seconds": SYNC_INTERVAL_SECONDS,
+    }
 
 
 @app.get("/")
@@ -419,3 +442,11 @@ def integration_status(
         google_status=google_conn.status if google_conn else "disconnected",
         stripe_status=stripe_conn.status if stripe_conn else "disconnected",
     )
+
+
+@app.post("/api/system/run-autosync-now")
+async def run_autosync_now(
+    current_user: User = Depends(auth.get_current_user),
+):
+    ingested = await sync_connected_businesses_once()
+    return {"status": "ok", "ingested": ingested}

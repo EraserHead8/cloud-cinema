@@ -114,6 +114,11 @@
         <h3>Autopublished</h3>
         <div id="autoPub" class="kpi">0</div>
       </div>
+      <div class="card span-12">
+        <h3>Automation</h3>
+        <button onclick="runAutosyncNow()">Run autosync now</button>
+        <span id="autoState" class="muted"></span>
+      </div>
 
       <div class="card span-6">
         <h3>Google Integration (mock/live)</h3>
@@ -244,6 +249,16 @@
         document.getElementById('wrr').textContent = `$${m.weekly_revenue_usd}`;
         document.getElementById('autoPub').textContent = String(m.autopublished);
       } catch (e) { log('Metrics failed: ' + e.message); }
+    }
+
+    async function runAutosyncNow() {
+      try {
+        const d = await req('/api/system/run-autosync-now', { method: 'POST' });
+        document.getElementById('autoState').textContent = `ingested=${d.ingested}`;
+        log('Autosync run completed: ingested=' + d.ingested);
+        await loadReviews();
+        await loadMetrics();
+      } catch (e) { log('Autosync run failed: ' + e.message); }
     }
 
     async function googleAuthUrl() {

@@ -73,6 +73,7 @@ curl -s "http://127.0.0.1:8010/api/metrics" -H "Authorization: Bearer $TOKEN"
 - Revenue estimation is automatic from active subscriptions.
 - Google sync endpoint can pull reviews and process all new items automatically.
 - Stripe checkout/webhook endpoints are available (mock in dev, live in prod with keys).
+- Background autosync loop runs continuously for connected Google businesses.
 
 ## What to connect for production
 - Google Business Profile OAuth + Review notifications (Pub/Sub)
@@ -87,6 +88,11 @@ curl -s "http://127.0.0.1:8010/api/metrics" -H "Authorization: Bearer $TOKEN"
 - `POST /api/integrations/stripe/checkout-session`
 - `POST /api/integrations/stripe/webhook`
 - `GET /api/integrations/status?business_id=<id>`
+- `POST /api/system/run-autosync-now`
+
+## Autosync settings
+- `AUTO_SYNC_ENABLED=1`
+- `SYNC_INTERVAL_SECONDS=120`
 
 ## VPS test deploy (without domain)
 ```bash
