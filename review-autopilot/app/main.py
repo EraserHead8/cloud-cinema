@@ -1,9 +1,11 @@
 import asyncio
 from datetime import datetime, timedelta
+import hashlib
+import hmac
 from pathlib import Path
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -22,7 +24,7 @@ from .services.google_gbp import build_auth_url, exchange_code, fetch_recent_rev
 from .services.pipeline import process_review_job
 from .services.scheduler import autosync_loop, sync_connected_businesses_once
 from .services.stripe_gateway import create_checkout_session, parse_event, verify_webhook_signature
-from .settings import AUTO_SYNC_ENABLED, SYNC_INTERVAL_SECONDS
+from .settings import APP_BASE_URL, AUTO_SYNC_ENABLED, SYNC_INTERVAL_SECONDS
 
 app = FastAPI(title="AI Review Autopilot")
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -68,6 +70,26 @@ def health() -> dict:
 @app.get("/")
 def dashboard() -> FileResponse:
     return FileResponse(WEB_DIR / "index.html")
+
+
+def _build_google_state(business_id: int, user_id: int) -> str:
+    raw = f"{business_id}:{user_id}"
+    secret = auth.JWT_SECRET.encode("utf-8")
+    sig = hmac.new(secret, raw.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
+    return f"{raw}:{sig}"
+
+
+def _parse_google_state(state: str) -> tuple[int, int]:
+    parts = state.split(":")
+    if len(parts) != 3:
+        raise HTTPException(status_code=400, detail="Invalid OAuth state")
+    business_id, user_id, sig = parts
+    raw = f"{business_id}:{user_id}"
+    secret = auth.JWT_SECRET.encode("utf-8")
+    expected = hmac.new(secret, raw.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
+    if not hmac.compare_digest(sig, expected):
+        raise HTTPException(status_code=400, detail="Invalid OAuth signature")
+    return int(business_id), int(user_id)
 
 
 @app.post("/api/auth/register", response_model=schemas.AuthResponse)
@@ -345,9 +367,24 @@ def google_auth_url(
     business = db.query(Business).filter(Business.id == business_id, Business.user_id == current_user.id).first()
     if not business:
         raise HTTPException(status_code=404, detail="Business not found")
-    url = build_auth_url(state=str(business.id))
+    state = _build_google_state(business.id, current_user.id)
+    url = build_auth_url(state=state)
     mode = "mock" if "mock.google" in url else "live"
     return schemas.GoogleAuthUrlOut(auth_url=url, mode=mode)
+
+
+@app.get("/api/integrations/google/connect")
+def google_connect(
+    business_id: int = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth.get_current_user),
+):
+    business = db.query(Business).filter(Business.id == business_id, Business.user_id == current_user.id).first()
+    if not business:
+        raise HTTPException(status_code=404, detail="Business not found")
+    state = _build_google_state(business.id, current_user.id)
+    url = build_auth_url(state=state)
+    return RedirectResponse(url=url, status_code=302)
 
 
 @app.post("/api/integrations/google/callback")
@@ -377,6 +414,40 @@ async def google_callback(
     db.commit()
 
     return {"status": "connected", "mode": token_data.get("mode", "live")}
+
+
+@app.get("/google/callback")
+async def google_oauth_callback(
+    code: str = Query(...),
+    state: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    business_id, user_id = _parse_google_state(state)
+    business = db.query(Business).filter(Business.id == business_id, Business.user_id == user_id).first()
+    if not business:
+        raise HTTPException(status_code=404, detail="Business not found for callback")
+
+    token_data = await exchange_code(code)
+
+    connection = db.query(GoogleConnection).filter(GoogleConnection.business_id == business.id).first()
+    if not connection:
+        connection = GoogleConnection(business_id=business.id)
+        db.add(connection)
+
+    connection.account_name = token_data.get("account_name")
+    connection.location_name = token_data.get("location_name")
+    connection.access_token = token_data.get("access_token")
+    connection.refresh_token = token_data.get("refresh_token")
+    connection.token_expires_at = datetime.utcnow() + timedelta(seconds=int(token_data.get("expires_in", 3600)))
+    connection.status = "connected"
+    connection.updated_at = datetime.utcnow()
+    db.commit()
+
+    return HTMLResponse(
+        f"""<!doctype html><html><body style='font-family:sans-serif;background:#0b1020;color:#fff;padding:24px'>
+<h2>Google Connected</h2><p>Business ID: {business.id}</p><p>Mode: {token_data.get('mode', 'live')}</p>
+<p><a href='{APP_BASE_URL}/' style='color:#6ea8fe'>Return to dashboard</a></p></body></html>"""
+    )
 
 
 @app.post("/api/integrations/google/sync-reviews")

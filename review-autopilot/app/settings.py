@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 APP_ENV = os.getenv("APP_ENV", "dev")
+APP_BASE_URL = os.getenv("APP_BASE_URL", "http://127.0.0.1:8010")
 
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")

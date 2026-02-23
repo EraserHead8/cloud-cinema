@@ -83,7 +83,9 @@ curl -s "http://127.0.0.1:8010/api/metrics" -H "Authorization: Bearer $TOKEN"
 
 ## New integration endpoints
 - `GET /api/integrations/google/auth-url?business_id=<id>`
+- `GET /api/integrations/google/connect?business_id=<id>`
 - `POST /api/integrations/google/callback`
+- `GET /google/callback` (OAuth browser redirect endpoint)
 - `POST /api/integrations/google/sync-reviews?business_id=<id>`
 - `POST /api/integrations/stripe/checkout-session`
 - `POST /api/integrations/stripe/webhook`

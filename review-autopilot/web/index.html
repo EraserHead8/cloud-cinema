@@ -124,6 +124,7 @@
         <h3>Google Integration (mock/live)</h3>
         <label>Business</label>
         <select id="bizSelectGoogle"></select>
+        <button class="primary" onclick="googleConnect()">Connect Google (OAuth)</button>
         <button onclick="googleAuthUrl()">Get auth URL</button>
         <button class="good" onclick="googleCallbackMock()">Complete callback (mock)</button>
         <button onclick="googleSync()">Sync reviews</button>
@@ -268,6 +269,15 @@
         document.getElementById('googleState').textContent = `mode=${d.mode}, url=${d.auth_url}`;
         log('Google auth URL received');
       } catch (e) { log('Google auth URL failed: ' + e.message); }
+    }
+
+    async function googleConnect() {
+      try {
+        const bid = document.getElementById('bizSelectGoogle').value;
+        const url = `/api/integrations/google/connect?business_id=${bid}`;
+        window.open(url, '_blank');
+        log('Opened Google OAuth connect flow');
+      } catch (e) { log('Google connect failed: ' + e.message); }
     }
 
     async function googleCallbackMock() {
