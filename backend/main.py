@@ -267,34 +267,35 @@ VCDN_TOKEN = "3i40G5TVIWKtBMGEHG9RiuKCJXv0F799"
 
 @app.get("/api/player-url")
 async def get_player_url(kp: str):
-    """Fetch raw player iframe URL from Kodik / VideoCDN APIs (server-side, no CORS issues)."""
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        # 1. Try Kodik
-        try:
-            resp = await client.get(
-                f"https://kodikapi.com/search?token={KODIK_TOKEN}&kinopoisk_id={kp}"
+    """Build playable sources via IMDb id resolved from Kinopoisk id."""
+    headers = {"X-API-KEY": KP_TOKEN, "Content-Type": "application/json"}
+    try:
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            details_resp = await client.get(
+                f"https://kinopoiskapiunofficial.tech/api/v2.2/films/{kp}",
+                headers=headers,
             )
-            data = resp.json()
-            if data.get("results") and len(data["results"]) > 0:
-                link = data["results"][0]["link"]
-                if link.startswith("//"):
-                    link = "https:" + link
-                return {"src": link, "provider": "kodik"}
-        except Exception as e:
-            print(f"Kodik API error: {e}")
+            details_resp.raise_for_status()
+            details = details_resp.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Не удалось получить данные фильма: {e}")
 
-        # 2. Try VideoCDN
-        try:
-            resp = await client.get(
-                f"https://videocdn.tv/api/short?api_token={VCDN_TOKEN}&kinopoisk_id={kp}"
-            )
-            data = resp.json()
-            if data.get("data") and len(data["data"]) > 0:
-                link = data["data"][0]["iframe_src"]
-                if link.startswith("//"):
-                    link = "https:" + link
-                return {"src": link, "provider": "videocdn"}
-        except Exception as e:
-            print(f"VideoCDN API error: {e}")
+    imdb_id = details.get("imdbId")
+    if not imdb_id:
+        raise HTTPException(status_code=404, detail="Для фильма не найден IMDb ID")
+
+    sources = [
+        {"name": "VidSrc To", "url": f"https://vidsrc.to/embed/movie/{imdb_id}"},
+        {"name": "VidSrc Me", "url": f"https://vidsrc.me/embed/movie/{imdb_id}"},
+        {"name": "VidSrc Xyz", "url": f"https://vidsrc.xyz/embed/movie?imdb={imdb_id}"},
+        {"name": "2Embed", "url": f"https://2embed.cc/embed/{imdb_id}"},
+    ]
+
+    return {
+        "src": sources[0]["url"],
+        "provider": sources[0]["name"],
+        "imdb_id": imdb_id,
+        "sources": sources,
+    }
 
 # End of file. Proxy endpoints removed for stability.

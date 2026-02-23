@@ -54,4 +54,11 @@ export const clearLibrary = async () => {
     return response.data;
 };
 
+export const getPlayerUrl = async (kpId) => {
+    const response = await api.get('/api/player-url', {
+        params: { kp: kpId },
+    });
+    return response.data;
+};
+
 export default api;
