@@ -7,6 +7,7 @@ import { getLibrary, deleteMovie, clearLibrary } from './api';
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [manualView, setManualView] = useState(null);
   const [movies, setMovies] = useState([]);
 
   const fetchMovies = async () => {
@@ -75,21 +76,29 @@ function App() {
     return <Auth onLogin={(t) => setToken(t)} />;
   }
 
-  // --- MOBILE: Admin Panel only ---
-  if (isMobile) {
-    return <AdminPanel onCommandSent={fetchMovies} />;
+  // --- VIEW DISPATCH ---
+  const currentView = manualView || (isMobile ? 'admin' : 'cinema');
+
+  if (currentView === 'admin') {
+    return <AdminPanel onCommandSent={fetchMovies} onSwitchToCinema={() => setManualView('cinema')} />;
   }
 
-  // --- DESKTOP: Cinema ---
+  // --- DESKTOP/MANUAL: Cinema ---
   return (
     <div className="min-h-screen bg-cinema-bg text-white font-sans">
       <div className="container mx-auto">
-        <header className="px-8 pt-8 pb-4 flex justify-between items-center bg-gradient-to-b from-cinema-bg to-transparent sticky top-0 z-40">
-          <h1 className="text-4xl font-black tracking-tight text-white/90 drop-shadow-md">
+        <header className="px-4 md:px-8 pt-8 pb-4 flex flex-wrap justify-between items-center bg-gradient-to-b from-cinema-bg to-transparent sticky top-0 z-40 gap-4">
+          <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white/90 drop-shadow-md">
             <span className="text-cinema-accent">Cloud</span>Cinema
           </h1>
-          <div className="flex items-center gap-4">
-            <div className="text-xs font-bold tracking-widest text-gray-500 uppercase border border-gray-700 px-3 py-1 rounded-full">TV Mode</div>
+          <div className="flex flex-wrap items-center gap-2 md:gap-4">
+            <button
+              onClick={() => setManualView('admin')}
+              className="text-xs font-bold tracking-widest text-zinc-300 hover:text-white uppercase border border-zinc-700 hover:border-zinc-500 px-3 py-1 rounded-full transition-colors"
+            >
+              Пульт
+            </button>
+            <div className="text-xs font-bold tracking-widest text-gray-500 uppercase border border-gray-700 px-3 py-1 rounded-full hidden sm:block">TV Mode</div>
             <button
               onClick={handleLogout}
               className="text-xs font-bold tracking-widest text-red-400 hover:text-red-300 uppercase border border-red-900/50 hover:border-red-600/50 px-3 py-1 rounded-full transition-colors"

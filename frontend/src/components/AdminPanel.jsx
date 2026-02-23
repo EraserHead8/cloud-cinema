@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Send, Mic } from 'lucide-react';
 import { sendCommand } from '../api';
 
-const AdminPanel = ({ onCommandSent }) => {
+const AdminPanel = ({ onCommandSent, onSwitchToCinema }) => {
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState(null);
@@ -54,10 +54,20 @@ const AdminPanel = ({ onCommandSent }) => {
     };
 
     return (
-        <div className="flex flex-col h-screen bg-zinc-950 text-white font-sans">
+        <div className="flex flex-col h-screen bg-zinc-950 text-white font-sans relative">
+            {onSwitchToCinema && (
+                <button
+                    onClick={onSwitchToCinema}
+                    type="button"
+                    className="absolute top-4 right-4 md:top-6 md:right-6 text-xs font-bold tracking-widest text-zinc-400 hover:text-white uppercase border border-zinc-700 hover:border-zinc-500 px-3 py-1 rounded-full transition-colors z-10"
+                >
+                    Библиотека
+                </button>
+            )}
+
             {/* Header */}
             <div className="flex-1 flex flex-col items-center p-6 space-y-4 overflow-y-auto">
-                <h1 className="text-3xl font-bold tracking-tighter text-red-600 mt-4">КИНО-ПУЛЬТ</h1>
+                <h1 className="text-3xl font-bold tracking-tighter text-red-600 mt-4 md:mt-0">КИНО-ПУЛЬТ</h1>
 
                 <div className="text-zinc-500 text-center text-sm">
                     <p>{loading ? 'Ищу...' : 'Голосовое управление'}</p>
@@ -66,8 +76,8 @@ const AdminPanel = ({ onCommandSent }) => {
 
                 {message && (
                     <div className={`px-4 py-2 rounded-md text-sm font-medium w-full max-w-lg text-center ${message.type === 'success' ? 'bg-green-900/30 text-green-400' :
-                            message.type === 'info' ? 'bg-blue-900/30 text-blue-400' :
-                                'bg-red-900/30 text-red-400'
+                        message.type === 'info' ? 'bg-blue-900/30 text-blue-400' :
+                            'bg-red-900/30 text-red-400'
                         }`}>
                         {message.text}
                     </div>
