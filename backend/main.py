@@ -281,15 +281,22 @@ async def get_player_url(kp: str):
         raise HTTPException(status_code=502, detail=f"Не удалось получить данные фильма: {e}")
 
     imdb_id = details.get("imdbId")
-    if not imdb_id:
-        raise HTTPException(status_code=404, detail="Для фильма не найден IMDb ID")
+    content_type = details.get("type", "FILM")
+    is_series = content_type in ["TV_SERIES", "MINI_SERIES", "TV_SHOW"]
+    v_type = "tv" if is_series else "movie"
 
     sources = [
-        {"name": "VidSrc To", "url": f"https://vidsrc.to/embed/movie/{imdb_id}"},
-        {"name": "VidSrc Me", "url": f"https://vidsrc.me/embed/movie/{imdb_id}"},
-        {"name": "VidSrc Xyz", "url": f"https://vidsrc.xyz/embed/movie?imdb={imdb_id}"},
-        {"name": "2Embed", "url": f"https://2embed.cc/embed/{imdb_id}"},
+        # Kinobox supports seasons and Russian voice translation ("озвучка") automatically
+        {"name": "Kinobox (RU)", "url": f"https://kinobox.tv/api/players?kinopoisk={kp}"},
+        {"name": "Kodik (RU)", "url": f"https://kodik.info/video/{kp}"},
     ]
+
+    if imdb_id:
+        sources.extend([
+            {"name": "VidSrc To", "url": f"https://vidsrc.to/embed/{v_type}/{imdb_id}"},
+            {"name": "VidSrc Me", "url": f"https://vidsrc.me/embed/{v_type}/{imdb_id}"},
+            {"name": "VidSrc Xyz", "url": f"https://vidsrc.xyz/embed/{v_type}?imdb={imdb_id}"},
+        ])
 
     return {
         "src": sources[0]["url"],
