@@ -30,12 +30,12 @@ api.interceptors.response.use(
 
 // --- API functions ---
 export const getLibrary = async () => {
-    const response = await api.get('/library');
+    const response = await api.get('/api/movies/all');
     return response.data;
 };
 
 export const addMovie = async (movieData) => {
-    const response = await api.post('/add', movieData);
+    const response = await api.post('/api/movies', movieData);
     return response.data;
 };
 

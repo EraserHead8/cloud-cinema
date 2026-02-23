@@ -2,6 +2,7 @@
 import asyncio
 import httpx
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Depends
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from typing import List, Dict
@@ -21,7 +22,9 @@ app.add_middleware(
 
 
 # Initialize DB
-models.Base.metadata.create_all(bind=database.engine)
+@app.on_event("startup")
+def startup_event():
+    models.Base.metadata.create_all(bind=database.engine)
 
 # --- KINOPOISK API ---
 KP_TOKEN = "8c8e1a50-6322-4135-8875-5d40a5420d86"
@@ -165,7 +168,56 @@ async def process_command(
     }
 
 
-@app.get("/library", response_model=List[schemas.Movie])
+@app.post("/api/movies", response_model=schemas.Movie)
+async def add_movie(
+    movie_data: schemas.MovieCreate,
+    db: Session = Depends(auth.get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    print(f"Adding movie: {movie_data}")
+    
+    if not movie_data.video_url:
+        try:
+            results = await search_kinopoisk(movie_data.title)
+            if not results:
+                return JSONResponse(status_code=404, content={"message": "Фильм не найден"})
+            
+            selected = results[0]
+            existing = db.query(models.Movie).filter(
+                models.Movie.video_url == selected["video_url"],
+                models.Movie.user_id == current_user.id,
+            ).first()
+            if existing:
+                return existing
+
+            movie = models.Movie(
+                title=selected["title"],
+                poster_url=selected["poster_url"],
+                rating=selected["rating"],
+                year=selected["year"],
+                video_url=selected["video_url"],
+                status="ready",
+                user_id=current_user.id,
+            )
+            db.add(movie)
+            db.commit()
+            db.refresh(movie)
+            return movie
+        except Exception as e:
+            print(f"Kinopoisk API error: {e}")
+            return JSONResponse(status_code=404, content={"message": "Фильм не найден"})
+
+    movie = models.Movie(
+        **movie_data.dict(),
+        user_id=current_user.id,
+    )
+    db.add(movie)
+    db.commit()
+    db.refresh(movie)
+    return movie
+
+
+@app.get("/api/movies/all", response_model=List[schemas.Movie])
 def get_library(
     db: Session = Depends(auth.get_db),
     current_user: models.User = Depends(auth.get_current_user),
