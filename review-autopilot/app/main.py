@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
+from pathlib import Path
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -20,6 +22,7 @@ from .services.pipeline import process_review_job
 from .services.stripe_gateway import create_checkout_session, parse_event, verify_webhook_signature
 
 app = FastAPI(title="AI Review Autopilot")
+WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,6 +40,11 @@ def on_startup() -> None:
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/")
+def dashboard() -> FileResponse:
+    return FileResponse(WEB_DIR / "index.html")
 
 
 @app.post("/api/auth/register", response_model=schemas.AuthResponse)

@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Review Autopilot</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #141a2f;
+      --line: #2a3358;
+      --text: #e8ecff;
+      --muted: #98a2c8;
+      --accent: #39d98a;
+      --warn: #ffce56;
+      --bad: #ff6b6b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background: radial-gradient(1200px 600px at 80% -20%, #1e2a57 0%, var(--bg) 45%);
+      color: var(--text);
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    .row { display: grid; gap: 16px; grid-template-columns: repeat(12, 1fr); }
+    .card {
+      background: linear-gradient(180deg, #151c34, var(--panel));
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .span-4 { grid-column: span 4; }
+    .span-6 { grid-column: span 6; }
+    .span-8 { grid-column: span 8; }
+    .span-12 { grid-column: span 12; }
+    @media (max-width: 900px) { .span-4,.span-6,.span-8,.span-12 { grid-column: span 12; } }
+    h1 { margin: 0 0 14px; font-size: 28px; }
+    h3 { margin: 0 0 8px; font-size: 16px; }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #0e1430;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 9px 10px;
+    }
+    button {
+      border: 1px solid #2f3e74;
+      background: #1c2954;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 9px 12px;
+      cursor: pointer;
+      font-weight: 600;
+      margin-right: 8px;
+      margin-top: 10px;
+    }
+    button.primary { background: #2755ff; border-color: #3a66ff; }
+    button.good { background: #0b6b48; border-color: #0e8d60; }
+    .muted { color: var(--muted); font-size: 12px; }
+    .kpi { font-size: 28px; font-weight: 700; margin-top: 6px; }
+    .ok { color: var(--accent); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+    .pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; border-bottom: 1px solid #24305a; padding: 8px 4px; font-size: 13px; vertical-align: top; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    #log { white-space: pre-wrap; font-size: 12px; color: var(--muted); max-height: 140px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <h1>AI Review Autopilot</h1>
+      <div>
+        <span id="authState" class="pill warn">Not logged in</span>
+        <button onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="card span-6">
+        <h3>Auth</h3>
+        <label>Email</label><input id="email" placeholder="owner@example.com" />
+        <label>Password</label><input id="password" type="password" value="StrongPass123" />
+        <button class="primary" onclick="register()">Register</button>
+        <button onclick="login()">Login</button>
+        <div class="muted">JWT is saved in localStorage.</div>
+      </div>
+
+      <div class="card span-6">
+        <h3>Business Setup</h3>
+        <label>Name</label><input id="bizName" value="Demo Local Biz" />
+        <label>Tone</label>
+        <select id="bizTone"><option>friendly</option><option>professional</option></select>
+        <label>Plan</label>
+        <select id="bizPlan"><option value="starter">starter ($79)</option><option value="pro">pro ($149)</option></select>
+        <button class="primary" onclick="createBusiness()">Create business</button>
+        <button onclick="loadBusinesses()">Refresh businesses</button>
+      </div>
+
+      <div class="card span-4">
+        <h3>MRR</h3>
+        <div id="mrr" class="kpi">$0</div>
+      </div>
+      <div class="card span-4">
+        <h3>Weekly</h3>
+        <div id="wrr" class="kpi">$0</div>
+      </div>
+      <div class="card span-4">
+        <h3>Autopublished</h3>
+        <div id="autoPub" class="kpi">0</div>
+      </div>
+
+      <div class="card span-6">
+        <h3>Google Integration (mock/live)</h3>
+        <label>Business</label>
+        <select id="bizSelectGoogle"></select>
+        <button onclick="googleAuthUrl()">Get auth URL</button>
+        <button class="good" onclick="googleCallbackMock()">Complete callback (mock)</button>
+        <button onclick="googleSync()">Sync reviews</button>
+        <div id="googleState" class="muted"></div>
+      </div>
+
+      <div class="card span-6">
+        <h3>Stripe Integration (mock/live)</h3>
+        <label>Business</label>
+        <select id="bizSelectStripe"></select>
+        <button onclick="createCheckout()">Create checkout session</button>
+        <div id="checkout" class="muted"></div>
+      </div>
+
+      <div class="card span-12">
+        <h3>Reviews</h3>
+        <label>Business</label>
+        <select id="bizSelectReviews"></select>
+        <button onclick="loadReviews()">Load reviews</button>
+        <table>
+          <thead><tr><th>ID</th><th>Author</th><th>Rating</th><th>Status</th><th>Review</th><th>AI Response</th></tr></thead>
+          <tbody id="reviewsBody"></tbody>
+        </table>
+      </div>
+
+      <div class="card span-12">
+        <h3>Event Log</h3>
+        <div id="log"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = '';
+    const state = { token: localStorage.getItem('ra_token') || '', businesses: [] };
+
+    function log(msg) {
+      const box = document.getElementById('log');
+      box.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n` + box.textContent;
+    }
+
+    function authHeaders() {
+      return state.token ? { Authorization: `Bearer ${state.token}` } : {};
+    }
+
+    async function req(path, opts = {}) {
+      const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}), ...authHeaders() };
+      const res = await fetch(API + path, { ...opts, headers });
+      const text = await res.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+      if (!res.ok) throw new Error(data.detail || JSON.stringify(data));
+      return data;
+    }
+
+    function renderAuth() {
+      const el = document.getElementById('authState');
+      if (state.token) { el.textContent = 'Logged in'; el.className = 'pill ok'; }
+      else { el.textContent = 'Not logged in'; el.className = 'pill warn'; }
+    }
+
+    async function register() {
+      try {
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        const data = await req('/api/auth/register', { method: 'POST', body: JSON.stringify({ email, password }), headers: {} });
+        state.token = data.access_token; localStorage.setItem('ra_token', state.token); renderAuth();
+        log('Registered and logged in');
+        await loadBusinesses(); await loadMetrics();
+      } catch (e) { log('Register failed: ' + e.message); }
+    }
+
+    async function login() {
+      try {
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        const data = await req('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }), headers: {} });
+        state.token = data.access_token; localStorage.setItem('ra_token', state.token); renderAuth();
+        log('Logged in');
+        await loadBusinesses(); await loadMetrics();
+      } catch (e) { log('Login failed: ' + e.message); }
+    }
+
+    function logout() {
+      state.token = ''; localStorage.removeItem('ra_token'); renderAuth();
+      log('Logged out');
+    }
+
+    function fillBizSelectors() {
+      const ids = ['bizSelectGoogle', 'bizSelectStripe', 'bizSelectReviews'];
+      ids.forEach((id) => {
+        const s = document.getElementById(id);
+        s.innerHTML = state.businesses.map((b) => `<option value="${b.id}">${b.id}: ${b.name}</option>`).join('');
+      });
+    }
+
+    async function createBusiness() {
+      try {
+        const payload = {
+          name: document.getElementById('bizName').value.trim(),
+          tone: document.getElementById('bizTone').value,
+          locale: 'en',
+          plan: document.getElementById('bizPlan').value,
+        };
+        const b = await req('/api/businesses', { method: 'POST', body: JSON.stringify(payload) });
+        log(`Business created: ${b.id} ${b.name}`);
+        await loadBusinesses(); await loadMetrics();
+      } catch (e) { log('Create business failed: ' + e.message); }
+    }
+
+    async function loadBusinesses() {
+      try {
+        state.businesses = await req('/api/businesses');
+        fillBizSelectors();
+        log('Businesses loaded: ' + state.businesses.length);
+      } catch (e) { log('Load businesses failed: ' + e.message); }
+    }
+
+    async function loadMetrics() {
+      try {
+        const m = await req('/api/metrics');
+        document.getElementById('mrr').textContent = `$${m.monthly_revenue_usd}`;
+        document.getElementById('wrr').textContent = `$${m.weekly_revenue_usd}`;
+        document.getElementById('autoPub').textContent = String(m.autopublished);
+      } catch (e) { log('Metrics failed: ' + e.message); }
+    }
+
+    async function googleAuthUrl() {
+      try {
+        const bid = document.getElementById('bizSelectGoogle').value;
+        const d = await req(`/api/integrations/google/auth-url?business_id=${bid}`);
+        document.getElementById('googleState').textContent = `mode=${d.mode}, url=${d.auth_url}`;
+        log('Google auth URL received');
+      } catch (e) { log('Google auth URL failed: ' + e.message); }
+    }
+
+    async function googleCallbackMock() {
+      try {
+        const bid = Number(document.getElementById('bizSelectGoogle').value);
+        const d = await req('/api/integrations/google/callback', { method: 'POST', body: JSON.stringify({ business_id: bid, code: 'demo-code' }) });
+        log('Google callback: ' + JSON.stringify(d));
+      } catch (e) { log('Google callback failed: ' + e.message); }
+    }
+
+    async function googleSync() {
+      try {
+        const bid = document.getElementById('bizSelectGoogle').value;
+        const d = await req(`/api/integrations/google/sync-reviews?business_id=${bid}`, { method: 'POST' });
+        log('Google sync: ingested=' + d.ingested);
+        await loadReviews();
+        await loadMetrics();
+      } catch (e) { log('Google sync failed: ' + e.message); }
+    }
+
+    async function createCheckout() {
+      try {
+        const bid = Number(document.getElementById('bizSelectStripe').value);
+        const d = await req('/api/integrations/stripe/checkout-session', {
+          method: 'POST',
+          body: JSON.stringify({
+            business_id: bid,
+            success_url: window.location.origin + '/?checkout=ok',
+            cancel_url: window.location.origin + '/?checkout=cancel',
+          })
+        });
+        document.getElementById('checkout').innerHTML = `mode=${d.mode} <a href="${d.checkout_url}" target="_blank">open checkout</a>`;
+        log('Checkout created: ' + d.session_id);
+      } catch (e) { log('Checkout failed: ' + e.message); }
+    }
+
+    async function loadReviews() {
+      try {
+        const bid = document.getElementById('bizSelectReviews').value;
+        if (!bid) return;
+        const rows = await req(`/api/reviews?business_id=${bid}`);
+        const body = document.getElementById('reviewsBody');
+        body.innerHTML = rows.map((r) => `
+          <tr>
+            <td>${r.id}</td>
+            <td>${r.author_name}</td>
+            <td>${r.rating}</td>
+            <td>${r.status}</td>
+            <td>${(r.text || '').replaceAll('<','&lt;')}</td>
+            <td>${(r.response_text || '').replaceAll('<','&lt;')}<br><span class="muted">${r.response_status || ''}</span></td>
+          </tr>`).join('');
+        log('Reviews loaded: ' + rows.length);
+      } catch (e) { log('Load reviews failed: ' + e.message); }
+    }
+
+    (async function init() {
+      renderAuth();
+      if (state.token) {
+        await loadBusinesses();
+        await loadMetrics();
+      }
+    })();
+  </script>
+</body>
+</html>
