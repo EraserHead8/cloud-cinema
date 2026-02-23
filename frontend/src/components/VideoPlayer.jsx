@@ -1,19 +1,29 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const VideoPlayer = ({ movie, isOpen, onClose }) => {
     const iframeRef = useRef(null);
-    const [sourceIndex, setSourceIndex] = useState(null);
+    const [sourceIndex, setSourceIndex] = useState(0);
+
+    useEffect(() => {
+        if (isOpen) {
+            setSourceIndex(0);
+        }
+    }, [movie?.id, isOpen]);
 
     if (!isOpen || !movie) return null;
 
     const cleanId = movie.kp_id || movie.video_url?.replace(/\D/g, '') || '';
 
-    const sources = [
-        { name: "S1: Shiza", url: `https://shiza.libdoor.cyou/video/kp/${cleanId}` },
-        { name: "S2: VidSrc", url: `https://vidsrc.me/embed/movie?kp=${cleanId}` },
-        { name: "S3: Alloha", url: `https://api.alloha.tv/?kp=${cleanId}` },
-        { name: "S4: Kodik", url: `https://kodik.info/video/${cleanId}` } // Optional fallback
-    ];
+    const sources = [];
+    if (movie.video_url?.startsWith('http')) {
+        sources.push({ name: 'S1: Saved', url: movie.video_url });
+    }
+    if (cleanId) {
+        sources.push({ name: "S2: Shiza", url: `https://shiza.libdoor.cyou/video/kp/${cleanId}` });
+        sources.push({ name: "S3: VidSrc", url: `https://vidsrc.me/embed/movie?kp=${cleanId}` });
+        sources.push({ name: "S4: Alloha", url: `https://api.alloha.tv/?kp=${cleanId}` });
+        sources.push({ name: "S5: Kodik", url: `https://kodik.info/video/${cleanId}` });
+    }
 
     const currentSource = sourceIndex !== null ? sources[sourceIndex] : null;
 
