@@ -58,7 +58,7 @@ async def exchange_code(code: str) -> dict:
 
 
 async def fetch_recent_reviews(access_token: str, location_name: str) -> list[dict]:
-    if MOCK_MODE:
+    if MOCK_MODE or not GOOGLE_CLIENT_ID or location_name.startswith("accounts/mock-account"):
         now = int(time.time())
         return [
             {
